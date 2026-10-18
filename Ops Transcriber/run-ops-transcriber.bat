@@ -28,6 +28,8 @@ for %%D in ("%STT_INPUT_DIR%" "%STT_AUDIO_DIR_1%" "%STT_AUDIO_DIR_2%" "%STT_LOGS
 if not exist ".venv\Scripts\python.exe" goto :setup
 if not exist "node_modules\express" goto :setup
 if not exist "%MODEL_PATH%" goto :setup
+rem A ZIP download from GitHub contains only a tiny Git LFS pointer instead of the real model.
+for %%F in ("%MODEL_PATH%") do if %%~zF LSS 1000000 goto :setup
 goto :launch
 
 :setup

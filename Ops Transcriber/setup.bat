@@ -73,11 +73,16 @@ if not exist "node_modules\express" (
 )
 
 if not exist "%MODEL_DIR%" mkdir "%MODEL_DIR%"
+rem A ZIP download from GitHub contains only a tiny Git LFS pointer instead of the real model.
+if exist "%MODEL_PATH%" for %%F in ("%MODEL_PATH%") do if %%~zF LSS 1000000 (
+    echo The AI model file is only a Git LFS placeholder. Downloading the real model...
+    del /f /q "%MODEL_PATH%"
+)
 if not exist "%MODEL_PATH%" (
-    echo Downloading the AI model from the latest GitHub Release...
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; $repo = '%MODEL_RELEASE_REPOSITORY%'; $modelName = '%MODEL_NAME%'; $destination = Join-Path (Get-Location) ('models\' + $modelName); $release = Invoke-RestMethod -Headers @{ 'User-Agent' = 'Ops-Transcriber-Setup' } -Uri ('https://api.github.com/repos/' + $repo + '/releases/latest'); $asset = @($release.assets) | Where-Object { $_.name -eq $modelName } | Select-Object -First 1; if (-not $asset) { throw ('The latest release does not contain ' + $modelName + '. Ask the project owner to attach that file to the release.') }; $temporary = $destination + '.download'; Invoke-WebRequest -UseBasicParsing -Headers @{ 'User-Agent' = 'Ops-Transcriber-Setup' } -Uri $asset.browser_download_url -OutFile $temporary; Move-Item -Force $temporary $destination"
+    echo Downloading the AI model ^(about 1.9 GB^). This may take several minutes...
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue'; $repo = '%MODEL_RELEASE_REPOSITORY%'; $modelName = '%MODEL_NAME%'; $headers = @{ 'User-Agent' = 'Ops-Transcriber-Setup' }; $destination = Join-Path (Get-Location) ('models\' + $modelName); $url = $null; try { $release = Invoke-RestMethod -Headers $headers -Uri ('https://api.github.com/repos/' + $repo + '/releases/latest'); $asset = @($release.assets) | Where-Object { $_.name -eq $modelName } | Select-Object -First 1; if ($asset) { $url = $asset.browser_download_url } } catch { }; if (-not $url) { $url = 'https://media.githubusercontent.com/media/' + $repo + '/main/Ops%%20Transcriber/models/' + $modelName }; Write-Host ('Source: ' + $url); $temporary = $destination + '.download'; Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri $url -OutFile $temporary; if ((Get-Item $temporary).Length -lt 1000000) { Remove-Item -Force $temporary; throw 'Downloaded file is not a valid model.' }; Move-Item -Force $temporary $destination"
     if errorlevel 1 (
-        echo Failed to download the AI model. Check the internet connection and that the latest GitHub Release includes %MODEL_NAME%.
+        echo Failed to download the AI model. Check the internet connection, or download %MODEL_NAME% manually into the models folder.
         pause
         exit /b 1
     )

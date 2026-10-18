@@ -38,7 +38,9 @@ The first launch performs setup automatically:
 
 - creates the local Python environment;
 - installs the required Python and Node.js packages; and
-- downloads the main local GPT4All/Llama model from the latest GitHub Release.
+- downloads the main local GPT4All/Llama model from the latest GitHub Release,
+  or from Git LFS if no release contains it. A GitHub "Download ZIP" only
+  contains a small LFS placeholder for the model; setup detects and replaces it.
 
 If Ollama is installed, the launcher also checks for the local
 `qwen2.5vl:3b` vision model. If it is missing, it downloads it automatically.
