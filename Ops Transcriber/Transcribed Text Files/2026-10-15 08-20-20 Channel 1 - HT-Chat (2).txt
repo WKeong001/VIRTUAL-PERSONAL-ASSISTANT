@@ -1,0 +1,1 @@
+[0.00s -> 4.28s] Echo 1, subject Alpha-sided near Civic Square, walking alone.

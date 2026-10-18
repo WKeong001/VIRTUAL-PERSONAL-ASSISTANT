@@ -1,0 +1,1 @@
+[0.00s -> 4.22s] Echo 2, subject has exited and is walking toward Harbor Lane

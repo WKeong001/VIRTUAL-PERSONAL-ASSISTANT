@@ -1,0 +1,1 @@
+[0.00s -> 3.64s] Echo 3, final location update recorded at Civic Square.

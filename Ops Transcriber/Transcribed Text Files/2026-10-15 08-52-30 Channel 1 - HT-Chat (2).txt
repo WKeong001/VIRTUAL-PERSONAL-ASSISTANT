@@ -1,0 +1,1 @@
+[0.00s -> 3.28s] Echo 1, subject now moving towards Central Walk

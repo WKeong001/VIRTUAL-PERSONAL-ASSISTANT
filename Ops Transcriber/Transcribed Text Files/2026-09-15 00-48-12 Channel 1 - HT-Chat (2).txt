@@ -1,0 +1,1 @@
+[0.00s -> 3.78s] Subject remains cooperative, no immediate safety concerns.

@@ -1,0 +1,1 @@
+[0.00s -> 3.66s] Handover complete. Property details passed to Delta 8.

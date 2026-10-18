@@ -1,0 +1,1 @@
+[0.00s -> 3.40s] Copy search complete and no dangerous items found

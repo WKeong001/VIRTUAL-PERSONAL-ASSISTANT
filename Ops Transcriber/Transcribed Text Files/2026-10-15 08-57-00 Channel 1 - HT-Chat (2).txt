@@ -1,0 +1,1 @@
+[0.00s -> 5.28s] Echo 1, subject Alpha continuing along Riverside Drive, no interaction noted.

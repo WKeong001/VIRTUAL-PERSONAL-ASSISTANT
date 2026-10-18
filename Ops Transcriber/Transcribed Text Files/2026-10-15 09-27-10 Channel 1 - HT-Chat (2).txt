@@ -1,0 +1,1 @@
+[0.00s -> 3.00s] Control copies, report when visual is restored

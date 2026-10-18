@@ -1,0 +1,7 @@
+# Optional NVIDIA CUDA dependencies. Install these after the standard setup only
+# on a compatible Windows workstation with a supported NVIDIA GPU.
+-r requirements.txt
+--extra-index-url https://download.pytorch.org/whl/cu124
+nvidia-cublas-cu12
+nvidia-cudnn-cu12>=9,<10
+torch>=2.6.0

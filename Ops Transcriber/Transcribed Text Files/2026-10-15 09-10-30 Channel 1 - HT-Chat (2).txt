@@ -1,0 +1,1 @@
+[0.00s -> 3.92s] Control copies, subject Alpha remains near Northgate Center

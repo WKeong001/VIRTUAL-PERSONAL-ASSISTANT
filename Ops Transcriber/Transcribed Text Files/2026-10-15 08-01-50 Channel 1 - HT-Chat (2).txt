@@ -1,0 +1,1 @@
+[0.00s -> 2.94s] Echo when receiving clearly, ready for the exercise.

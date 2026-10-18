@@ -1,0 +1,1 @@
+[0.00s -> 3.58s] Echo 1, checking the immediate public area for a new sighting.

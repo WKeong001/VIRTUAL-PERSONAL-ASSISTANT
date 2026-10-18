@@ -1,0 +1,1 @@
+[0.00s -> 3.48s] Echo free, subject ordered a drink, and returned to the seat.

@@ -1,0 +1,1 @@
+[0.00s -> 6.40s] Control, Delta 8 arrived at the designated facility

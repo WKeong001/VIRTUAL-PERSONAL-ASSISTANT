@@ -1,0 +1,18 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Batch CodeName Refinement",
+			"type": "shell",
+			"command": "${workspaceFolder}/.venv/Scripts/python.exe",
+			"args": [
+				".tmp_prompt_batch_simple.py",
+				"--batch-size",
+				"20",
+				"--max-batches",
+				"3"
+			],
+			"isBackground": false
+		}
+	]
+}

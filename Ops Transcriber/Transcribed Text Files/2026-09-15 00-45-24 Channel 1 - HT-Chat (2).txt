@@ -1,0 +1,1 @@
+[0.00s -> 3.24s] Checking level 2, moving slowly through the central aisle

@@ -1,0 +1,1 @@
+[0.00s -> 4.04s] Echo 1, subject continuing along Central Avenue at normal pace.

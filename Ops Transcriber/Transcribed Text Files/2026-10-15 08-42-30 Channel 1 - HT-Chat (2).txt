@@ -1,0 +1,1 @@
+[0.00s -> 3.44s] Echo 1, subject stood briefly and then sat again.

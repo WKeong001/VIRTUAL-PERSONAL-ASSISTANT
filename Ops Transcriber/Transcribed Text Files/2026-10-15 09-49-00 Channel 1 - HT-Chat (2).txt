@@ -1,0 +1,1 @@
+[0.00s -> 4.00s] Echo 1, Subject Alpha moving back toward Riverside Plaza

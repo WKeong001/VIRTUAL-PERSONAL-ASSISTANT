@@ -1,0 +1,1 @@
+[0.00s -> 3.84s] Control copies, subject Alpha sided near Northgate Center

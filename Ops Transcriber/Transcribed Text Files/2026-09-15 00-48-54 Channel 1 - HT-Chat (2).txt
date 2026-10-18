@@ -1,0 +1,1 @@
+[0.00s -> 3.50s] Subject remains compliant. No force required.

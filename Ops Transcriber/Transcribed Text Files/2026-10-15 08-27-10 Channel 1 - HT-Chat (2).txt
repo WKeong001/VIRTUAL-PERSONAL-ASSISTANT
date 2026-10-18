@@ -1,0 +1,1 @@
+[0.00s -> 4.00s] Control copies, location update recorded as Northgate Center

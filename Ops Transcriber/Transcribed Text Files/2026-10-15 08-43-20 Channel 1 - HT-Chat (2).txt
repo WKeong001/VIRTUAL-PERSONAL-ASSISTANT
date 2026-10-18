@@ -1,0 +1,1 @@
+[0.00s -> 3.76s] Echo 2, subject remains alone, no notable interaction

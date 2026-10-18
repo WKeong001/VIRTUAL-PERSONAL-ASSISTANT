@@ -1,0 +1,1980 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Speech-to-text Program</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #f3f6fb;
+        --surface: #ffffff;
+        --text: #1f2937;
+        --muted: #4b5563;
+        --accent: #1d4ed8;
+        --accent-hover: #1e40af;
+        --border: #cbd5e1;
+        --danger: #dc2626;
+        --ok: #16a34a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      header.app-header {
+        background:
+          linear-gradient(130deg, rgba(255, 244, 233, 0.92), rgba(236, 252, 253, 0.86)),
+          #fffdf9;
+        color: #1f2933;
+        width: min(1100px, 94vw);
+        margin: 20px auto 0;
+        border: 1px solid rgba(255, 255, 255, 0.75);
+        border-radius: 22px;
+        box-shadow: 0 20px 45px rgba(25, 41, 51, 0.1);
+        padding: clamp(20px, 3.8vw, 34px);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      header.app-header h1 {
+        margin: 0;
+        font-family: "Sora", "Trebuchet MS", sans-serif;
+        font-size: clamp(1.6rem, 3.4vw, 2.25rem);
+        font-weight: 700;
+        line-height: 1.2;
+      }
+      header.app-header p { margin: 6px 0 0; font-size: 0.9rem; color: #5a6470; opacity: 1; }
+      .session-card h2 {
+        margin: 0 0 10px; font-family: "Sora", "Trebuchet MS", sans-serif;
+        font-size: 1.05rem; font-weight: 700; color: #1f2933;
+      }
+      .session-box {
+        border: 1px solid var(--border); border-radius: 10px;
+        padding: 12px 14px; color: var(--muted);
+        background: #f7faff; font-size: 0.92rem;
+      }
+      .header-right { display: flex; align-items: center; gap: 12px; }
+      .status-dot { font-size: 0.8rem; opacity: 0.9; }
+      main { width: min(1100px, 94vw); margin: 0 auto; padding: 20px 0; }
+      .tabs {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+        align-items: stretch;
+      }
+      .tab-btn {
+        appearance: none; border: none; cursor: pointer;
+        min-height: 46px; padding: 10px 14px; font-family: inherit; font-size: 0.95rem; font-weight: 700;
+        border-radius: 12px; color: #203036;
+        background: linear-gradient(145deg, #dbe8e9, #c5d7d8);
+        line-height: 1.2; white-space: normal; text-align: center;
+        display: flex; align-items: center; justify-content: center;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      }
+      .tab-btn:hover { transform: translateY(-1px); }
+      .tab-btn.active {
+        color: #fff;
+        background: linear-gradient(145deg, #cc5d2f, #b3471b);
+        box-shadow: 0 10px 18px rgba(179, 71, 27, 0.35);
+      }
+      .panel { display: none; }
+      .panel.active { display: block; }
+      .card {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 12px; padding: 16px; box-shadow: 0 6px 16px rgba(15,23,42,0.05);
+        margin-bottom: 16px;
+      }
+      .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+      .spacer { flex: 1; }
+      .btn {
+        appearance: none; cursor: pointer; border: 1px solid transparent;
+        border-radius: 8px; padding: 8px 14px; font-size: 0.9rem; font-weight: 600;
+        background: var(--accent); color: #fff; transition: background 0.15s ease;
+      }
+      .btn:hover { background: var(--accent-hover); }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .btn.secondary { background: #eef2ff; color: var(--accent); border-color: #c7d2fe; }
+      .btn.secondary:hover { background: #e0e7ff; }
+      .btn.danger { background: var(--danger); }
+      .btn.danger:hover { background: #b91c1c; }
+      .btn.ok { background: var(--ok); }
+      .btn.small { padding: 5px 10px; font-size: 0.8rem; }
+      .muted { color: var(--muted); font-size: 0.85rem; }
+      .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+      .item {
+        border: 1px solid var(--border); border-radius: 10px; padding: 12px;
+        background: #fff; display: flex; flex-direction: column; gap: 8px;
+      }
+      .item.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(29,78,216,0.15); }
+      .item.active-row { border-color: var(--accent); background: #f5f8ff; box-shadow: inset 3px 0 0 var(--accent); }
+      .item-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); }
+      .item-content { white-space: pre-wrap; word-break: break-word; font-size: 0.92rem; line-height: 1.45; }
+      .item-audio { width: 100%; max-width: 420px; height: 34px; }
+      textarea {
+        width: 100%; min-height: 120px; resize: vertical; padding: 10px;
+        border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 0.92rem;
+      }
+      textarea.edit-area { min-height: 40px; }
+      .kbd-hint { display: inline-block; margin-left: 6px; }
+      kbd {
+        display: inline-block; padding: 1px 6px; font-size: 0.78rem; font-family: inherit;
+        line-height: 1.4; color: var(--text); background: #f3f4f6;
+        border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px;
+      }
+      input[type="text"], input[type="number"] {
+        padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit;
+      }
+      .empty { text-align: center; padding: 32px; color: var(--muted); }
+      .live-box {
+        min-height: 140px; border: 1px dashed var(--border); border-radius: 10px;
+        padding: 14px; background: #fbfdff; white-space: pre-wrap; font-size: 1rem; line-height: 1.5;
+      }
+      .rec-indicator { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--danger); }
+      .rec-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--danger); animation: pulse 1s infinite; }
+      @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+      .toast {
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+        background: #111827; color: #fff; padding: 10px 18px; border-radius: 8px;
+        font-size: 0.9rem; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; z-index: 50;
+      }
+      .toast.show { opacity: 1; }
+      .badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 999px; background: #e0e7ff; color: var(--accent); font-weight: 600; }
+      .badge.live { background: #fee2e2; color: var(--danger); }
+      .badge.st-processing { background: #fef3c7; color: #b45309; }
+      .badge.st-pending { background: #e5e7eb; color: #374151; }
+      .badge.st-done { background: #dcfce7; color: #15803d; }
+      .badge.st-error { background: #fee2e2; color: #b91c1c; }
+      .badge.st-missing { background: #fde68a; color: #92400e; }
+      .progress { height: 10px; background: #e5e7eb; border-radius: 999px; overflow: hidden; margin-top: 10px; }
+      .progress > span { display: block; height: 100%; background: var(--ok); transition: width 0.3s ease; }
+      .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+      .now-transcribing { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--accent); margin-top: 10px; }
+      a.link { color: #fff; text-decoration: none; font-size: 0.85rem; opacity: 0.9; }
+      a.link:hover { text-decoration: underline; }
+      table.rpt { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+      table.rpt th, table.rpt td { border: 1px solid var(--border); padding: 8px; vertical-align: top; text-align: left; }
+      table.rpt th { background: #eef2ff; color: var(--accent); }
+      table.rpt td[contenteditable] { background: #fbfdff; }
+      .field { display: flex; flex-direction: column; gap: 4px; }
+      .field label { font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+      .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+      label { font-size: 0.85rem; }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>Speech-to-text Program</h1>
+        <p>Convert PTTOC communication to text for transcripts and report drafting.</p>
+      </div>
+    </header>
+
+    <main>
+      <div class="card tabs-card">
+        <div class="tabs" role="tablist">
+          <button class="tab-btn active" data-tab="live">Live Transcript</button>
+          <button class="tab-btn" data-tab="raw">Raw Transcript <span id="rawCount" class="badge">0</span></button>
+          <button class="tab-btn" data-tab="entries">Key Occurrences</button>
+          <button class="tab-btn" data-tab="report" style="display:none">Report Draft</button>
+          <button class="tab-btn" data-tab="aireport">AI Report Draft</button>
+          <button class="tab-btn" data-tab="logsassistant">Log Assistant</button>
+          <button class="tab-btn" data-tab="ai">AI Chatbot</button>
+          <button class="tab-btn" data-tab="settings">Settings</button>
+        </div>
+      </div>
+
+      <!-- Live Transcript View -->
+      <section id="panel-live" class="panel active">
+        <div class="card">
+          <div class="row">
+            <strong>Processed Transcriptions</strong>
+            <span class="spacer"></span>
+            <span id="liveModeInfo" class="muted"></span>
+            <button id="liveStart" class="btn small">▶ Start live</button>
+            <button id="liveExportDocx" class="btn ok small">⬇ Export Report</button>
+            <button id="refreshLive" class="btn secondary small">Refresh</button>
+          </div>
+          <p class="muted">Reviewed and saved transcripts. Filter or edit as needed.
+            <span class="kbd-hint">Tip: click a row, then <kbd>Ctrl</kbd>+<kbd>E</kbd> to edit and <kbd>Ctrl</kbd>+<kbd>S</kbd> to save.</span>
+          </p>
+          <div class="row" style="margin-top:10px">
+            <label>Channel:
+              <select id="liveChannel"><option value="">All</option></select>
+            </label>
+            <label>From: <input type="date" id="liveDateFrom" /></label>
+            <label>To: <input type="date" id="liveDateTo" /></label>
+            <label><input type="checkbox" id="liveShowNoConversation" /> Show no-conversation files</label>
+            <button id="liveFilterClear" class="btn secondary small">Clear filters</button>
+          </div>
+          <div class="row" id="liveBulkBar" style="margin-top:10px;display:none">
+            <label style="display:flex;align-items:center;gap:6px;font-weight:600">
+              <input type="checkbox" id="liveSelectAll" /> Select all displayed
+            </label>
+            <span id="liveSelectedCount" class="muted">0 selected</span>
+            <span class="spacer"></span>
+            <button id="liveAddSelected" class="btn ok small" disabled>Add selected to Key Occurrences</button>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <label>Ops Reference: <input type="text" id="liveOpsRef" placeholder="e.g. H/1/2026" /></label>
+            <label>Name / Entity: <input type="text" id="liveSubject" placeholder="e.g. John Tan" /></label>
+            <label>DO: <input type="text" id="liveDO" placeholder="e.g. Hippo" /></label>
+          </div>
+        </div>
+        <ul id="liveList" class="list"></ul>
+        <div id="liveEmpty" class="empty" style="display:none">No processed transcriptions yet.</div>
+      </section>
+
+      <!-- Raw Transcript -->
+      <section id="panel-raw" class="panel">
+        <div class="card">
+          <div class="row">
+            <strong>Raw Transcript</strong>
+            <span class="spacer"></span>
+            <button id="scanBtn" class="btn secondary small">Scan folder</button>
+            <button id="refreshRaw" class="btn secondary small">Refresh</button>
+          </div>
+          <p class="muted">New transcription files are ingested automatically. Review, edit, then save to processed — or discard.</p>
+          <div class="row" id="rawBulkBar" style="display:none">
+            <label style="display:flex;align-items:center;gap:6px;font-weight:600">
+              <input type="checkbox" id="rawSelectAll" /> Select all
+            </label>
+            <span id="rawSelectedCount" class="muted">0 selected</span>
+            <span class="spacer"></span>
+            <button id="rawAddSelected" class="btn ok small" disabled>Add selected to Processed</button>
+            <button id="rawDiscardAll" class="btn danger small">Discard all</button>
+          </div>
+        </div>
+        <ul id="rawList" class="list"></ul>
+        <div id="rawEmpty" class="empty" style="display:none">No pending raw transcriptions.</div>
+      </section>
+
+      <section id="panel-entries" class="panel">
+        <div class="card">
+          <div class="row">
+            <strong>Key Occurrences</strong>
+            <span class="spacer"></span>
+            <button id="entriesExportDocx" class="btn ok small">⬇ Export Report</button>
+            <button id="entriesRefresh" class="btn secondary small">Refresh</button>
+            <button id="entriesClear" class="btn danger small">Clear all</button>
+          </div>
+          <p class="muted">Use this log book to add, edit, and delete key occurrences. The AI Report Draft uses these entries.</p>
+          <div class="row" style="margin-top:10px">
+            <label>From: <input type="date" id="entriesDateFrom" /></label>
+            <label>To: <input type="date" id="entriesDateTo" /></label>
+            <button id="entriesFilterClear" class="btn secondary small" type="button">Clear dates</button>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <label>Ops Reference: <input type="text" id="entriesOpsRef" placeholder="e.g. H/1/2026" /></label>
+            <label>Name / Entity: <input type="text" id="entriesSubject" placeholder="e.g. John Tan" /></label>
+            <label>DO: <input type="text" id="entriesDO" placeholder="e.g. Hippo" /></label>
+          </div>
+          <div class="meta-grid" style="margin-top:12px">
+            <div class="field">
+              <label>Date &amp; time <span id="entryTimeMode" class="muted" style="font-weight:400">(live)</span></label>
+              <div class="row">
+                <input type="datetime-local" step="1" id="entryTime" style="flex:1" />
+                <button id="entryTimeNow" class="btn secondary small" type="button" title="Resume live clock">Now</button>
+              </div>
+            </div>
+            <div class="field" style="grid-column:1 / -1"><label>Log / occurrence</label><textarea id="entryContent" placeholder="e.g. Person departed in vehicle SGX1234A heading towards AYE." style="min-height:70px"></textarea></div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button id="entryAdd" class="btn">Add entry</button>
+          </div>
+        </div>
+        <ul id="entriesList" class="list"></ul>
+        <div id="entriesEmpty" class="empty" style="display:none">No entries yet. Add relevant logs above.</div>
+      </section>
+
+      <!-- Report Draft -->
+      <section id="panel-report" class="panel">
+        <div class="card">
+          <strong>Report Draft</strong>
+          <p class="muted">Build the operation report from the curated entries. Edit any cell, generate an AI narrative summary, then download as Word.</p>
+          <div class="meta-grid" style="margin-top:12px">
+            <div class="field"><label>Operation Reference</label><input type="text" id="repRef" placeholder="e.g. H/1/2026" /></div>
+            <div class="field"><label>Name / Entity</label><input type="text" id="repSubject" placeholder="e.g. John Tan" /></div>
+            <div class="field"><label>Date</label><input type="text" id="repDate" placeholder="e.g. 06/08/26 (Wed)" /></div>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button id="repSummary" class="btn">Generate AI narrative summary</button>
+            <button id="repDownload" class="btn ok">Download .docx</button>
+            <span id="repBusy" class="muted" style="display:none">Working…</span>
+          </div>
+        </div>
+        <div class="card">
+          <table class="rpt">
+            <thead><tr><th style="width:120px">Time</th><th>Movements</th><th style="width:140px">Remarks</th><th style="width:60px"></th></tr></thead>
+            <tbody id="repRows"></tbody>
+          </table>
+          <div class="row" style="margin-top:10px"><button id="repAddRow" class="btn secondary small">+ Add row</button></div>
+        </div>
+        <div id="repSummaryCard" class="card" style="display:none">
+          <div class="row"><strong>AI Narrative Summary</strong></div>
+          <div id="repSummaryText" class="item-content" style="margin-top:8px"></div>
+        </div>
+      </section>
+
+      <!-- AI Report Draft -->
+      <section id="panel-aireport" class="panel">
+        <div class="card">
+          <strong>AI Report Draft</strong>
+          <p class="muted">The AI merges occurrences within the configured time gap into single rows and rephrases the movements into proper English. The draft is saved, so <strong>Generate</strong> only processes new entries and resumes from where you stopped (still merging entries within 5 minutes). Edit if needed, save, then download as Word.</p>
+          <div class="meta-grid" style="margin-top:12px">
+            <div class="field"><label>Operation Reference</label><input type="text" id="airRef" placeholder="e.g. H/1/2026" /></div>
+            <div class="field"><label>Name / Entity</label><input type="text" id="airSubject" placeholder="e.g. John Tan" /></div>
+            <div class="field"><label>Date</label><input type="text" id="airDate" placeholder="e.g. 06/08/26 (Wed)" /></div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <label>From: <input type="date" id="airDateFrom" /></label>
+            <label>To: <input type="date" id="airDateTo" /></label>
+            <button id="airFilterClear" class="btn secondary small" type="button">Clear dates</button>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button id="airGenerate" class="btn">Generate new / resume</button>
+            <button id="airSave" class="btn secondary">Save edits</button>
+            <button id="airClear" class="btn danger">Clear report</button>
+            <button id="airDownload" class="btn ok">Download .docx</button>
+            <span id="airBusy" class="muted" style="display:none">Generating… (the model can take a while)</span>
+          </div>
+          <p id="airStatusLine" class="muted" style="margin-top:8px"></p>
+        </div>
+        <div class="card">
+          <table class="rpt">
+            <thead><tr><th style="width:110px">Date</th><th style="width:120px">Time</th><th>Movements</th><th style="width:140px">Remarks</th><th style="width:60px"></th></tr></thead>
+            <tbody id="airRows"></tbody>
+          </table>
+          <div class="row" style="margin-top:10px"><button id="airAddRow" class="btn secondary small">+ Add row</button></div>
+        </div>
+      </section>
+
+      <section id="panel-logsassistant" class="panel">
+        <div class="card">
+          <div class="row"><strong>Logs Assistant</strong><span class="spacer"></span><span id="logsAssistantStatus" class="muted"></span></div>
+          <p class="muted">Searches readable reports in the selected folder and its subfolders.</p>
+          <div class="row" style="margin-top:10px">
+            <input id="logsAssistantFolder" type="text" placeholder="Reports folder path" style="flex:1;min-width:240px" />
+            <button class="btn secondary small" type="button" data-browse="logsAssistantFolder">Browse</button>
+            <button id="logsAssistantScan" class="btn secondary small" type="button">Scan reports</button>
+          </div>
+          <div id="logsAssistantFiles" class="muted" style="margin-top:8px"></div>
+        </div>
+        <div class="card">
+          <input id="logsAssistantKeywords" type="text" placeholder="Keywords or date (e.g. vehicle, location, 20/9/2026, 20.9.26)" style="width:100%;margin-bottom:10px" />
+          <input id="logsAssistantPrompt" type="hidden" />
+          <div class="row" style="margin-top:10px"><button id="logsAssistantAsk" class="btn" type="button">Search keywords</button><span id="logsAssistantBusy" class="muted" style="display:none">Searching documents…</span></div>
+          <div id="logsAssistantAnswer" class="item-content" style="display:none;margin-top:12px"></div>
+        </div>
+      </section>
+
+      <!-- AI Assistant -->
+      <section id="panel-ai" class="panel">
+        <div class="card">
+          <div class="row">
+            <strong>Offline AI Assistant</strong>
+            <span class="spacer"></span>
+            <span id="aiStatus" class="muted">Checking AI service…</span>
+          </div>
+          <p class="muted">Powered by the local GPT4All model. Chat keeps recent messages only in this browser tab.</p>
+          <div class="row" style="margin:10px 0">
+            <label><input type="radio" name="aiMode" value="logs" checked /> Ask about logs (grounded in processed transcripts)</label>
+            <label><input type="radio" name="aiMode" value="sodraft" /> Ask from Key Occurrences</label>
+            <label><input type="radio" name="aiMode" value="general" /> Chat (offline)</label>
+          </div>
+          <textarea id="aiPrompt" placeholder="e.g. Rephrase: A person entered the car. Or: What time did Alpha team move?"></textarea>
+          <div class="row" style="margin-top:10px">
+            <button id="aiAsk" class="btn">Ask</button>
+            <button id="aiClear" class="btn secondary">Clear</button>
+            <span id="aiBusy" class="muted" style="display:none">Thinking… (the model can take a while)</span>
+          </div>
+        </div>
+        <div id="aiAnswerCard" class="card" style="display:none">
+          <div class="row"><strong>Answer</strong></div>
+          <div id="aiAnswer" class="item-content" style="margin-top:8px"></div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section id="panel-settings" class="panel">
+        <div class="card">
+          <strong>Transcription Folders &amp; Model</strong>
+          <p class="muted" style="margin-top:6px">The server watches these two folders for new audio files, transcribes them offline with Whisper, and writes the text to the output folder. Paths are on the server machine.</p>
+          <div class="meta-grid" style="margin-top:12px">
+            <div class="field"><label>Audio input folder 1</label>
+              <div style="display:flex; gap:6px">
+                <input type="text" id="setAudio1" placeholder="e.g. D:\\Recordings\\Channel1" style="flex:1; min-width:0" />
+                <button type="button" class="btn secondary small" data-browse="setAudio1">Browse…</button>
+              </div>
+            </div>
+            <div class="field"><label>Audio input folder 2</label>
+              <div style="display:flex; gap:6px">
+                <input type="text" id="setAudio2" placeholder="e.g. D:\\Recordings\\Channel2" style="flex:1; min-width:0" />
+                <button type="button" class="btn secondary small" data-browse="setAudio2">Browse…</button>
+              </div>
+            </div>
+            <div class="field"><label>Transcribed-text output folder</label>
+              <div style="display:flex; gap:6px">
+                <input type="text" id="setOutput" placeholder="(default: Ops Transcriber\\Transcribed Text Files)" style="flex:1; min-width:0" />
+                <button type="button" class="btn secondary small" data-browse="setOutput">Browse…</button>
+              </div>
+            </div>
+            <div class="field"><label>Whisper model</label>
+              <select id="setModel">
+                <option value="tiny">tiny</option>
+                <option value="base">base</option>
+                <option value="small">small</option>
+                <option value="medium">medium</option>
+                <option value="large-v2">large-v2</option>
+                <option value="large-v3">large-v3</option>
+                <option value="large-v3-turbo">large-v3-turbo</option>
+                <option value="distil-large-v3">distil-large-v3</option>
+              </select>
+            </div>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <label><input type="checkbox" id="setAuto" /> Auto-transcribe audio folders continuously in the background</label>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button id="setSave" class="btn">Save settings</button>
+            <span id="setEffective" class="muted"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row"><strong>Live Background Transcription</strong><span class="spacer"></span>
+            <button class="btn secondary small" data-audio-rescan="1">Rescan folder 1</button>
+            <button class="btn secondary small" data-audio-rescan="2">Rescan folder 2</button>
+            <button id="audioRefresh" class="btn secondary small">Refresh</button>
+          </div>
+          <div id="audioNow" class="now-transcribing" style="margin-top:12px"></div>
+        </div>
+
+        <div class="card">
+          <strong>Code-name Mapping</strong>
+          <p class="muted" style="margin-top:6px">Replace common mishearings with the correct name (whole-word, case-insensitive) when transcribing audio files.</p>
+          <table class="rpt" style="margin-top:10px">
+            <thead><tr><th>Heard (mishearing)</th><th>Correct name</th><th style="width:60px"></th></tr></thead>
+            <tbody id="codeNameRows"></tbody>
+          </table>
+          <div class="row" style="margin-top:10px">
+            <button id="codeNameAdd" class="btn secondary small">+ Add mapping</button>
+            <button id="codeNameSave" class="btn small">Save mappings</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <strong>App</strong>
+          <div class="row" style="margin-top:12px">
+            <label for="pollInterval">Auto-refresh interval (seconds):</label>
+            <input type="number" id="pollInterval" min="0" max="120" value="5" style="width:90px" />
+            <button id="savePoll" class="btn secondary small">Apply</button>
+          </div>
+          <p class="muted" style="margin-top:12px">Set to 0 to disable auto-refresh.</p>
+          <hr style="border:none;border-top:1px solid var(--border);margin:14px 0" />
+          <div class="muted">
+            <div>API endpoint: <code id="apiInfo">—</code></div>
+          </div>
+        </div>
+
+        <div class="card" hidden>
+          <strong>Danger Zone</strong>
+          <p class="muted" style="margin-top:6px">For trials only. Deletes all transcribe-app data: raw and processed transcriptions, the background audio queue, and report entries/rows. Settings (folders, model, code-name mappings) are kept. This cannot be undone.</p>
+          <div class="row" style="margin-top:10px">
+            <button id="dbReset" class="btn danger small">Delete database (clear all data)</button>
+            <span id="dbResetInfo" class="muted"></span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast"></div>
+
+    <div id="folderModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.45); z-index:1000; align-items:center; justify-content:center;">
+      <div style="background:#fff; border:1px solid var(--border); border-radius:12px; width:min(560px,92vw); max-height:82vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+        <div style="padding:14px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px;">
+          <strong style="flex:1">Select a folder</strong>
+          <button type="button" id="folderClose" class="btn secondary small">✕</button>
+        </div>
+        <div style="padding:10px 16px; border-bottom:1px solid var(--border); display:flex; gap:8px; align-items:center;">
+          <button type="button" id="folderUp" class="btn secondary small">⬆ Up</button>
+          <button type="button" id="folderDrives" class="btn secondary small">Drives</button>
+          <input type="text" id="folderPath" readonly style="flex:1; min-width:0; padding:6px 8px; border:1px solid var(--border); border-radius:8px; background:#f7faff; font-size:0.85rem;" />
+        </div>
+        <div id="folderList" style="flex:1; overflow:auto; padding:8px 10px;"></div>
+        <div style="padding:12px 16px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; align-items:center;">
+          <span id="folderHint" class="muted" style="flex:1"></span>
+          <button type="button" id="folderCancel" class="btn secondary small">Cancel</button>
+          <button type="button" id="folderSelect" class="btn small">Select this folder</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // --- API base + auth token resolution --------------------------------
+        const params = new URLSearchParams(window.location.search);
+        const isFile = window.location.protocol === "file:";
+        const queryApiBase = (params.get("apiBase") || "").trim().replace(/\/+$/, "");
+        let apiBase = queryApiBase;
+        if (!apiBase) {
+          if (isFile) apiBase = "http://127.0.0.1:3010";
+           else if (window.location.hostname === "127.0.0.1" && window.location.port === "3011") {
+             apiBase = "";
+           }
+          // The API always lives on the Node server (port 3010). When the page is
+          // served from anywhere else (e.g. Web Station on port 80/443 at a domain),
+          // route API calls to :3010. Only same-origin when already on 3010.
+          else if (window.location.port !== "3010") {
+            apiBase = window.location.protocol + "//" + window.location.hostname + ":3010";
+          } else apiBase = "";
+        }
+        const incomingAuthToken = String(params.get("authToken") || "").trim();
+        if (incomingAuthToken) {
+          sessionStorage.setItem("vehicleAppAuthToken", incomingAuthToken);
+          params.delete("authToken");
+          const cleanedQuery = params.toString();
+          window.history.replaceState({}, "", window.location.pathname + (cleanedQuery ? "?" + cleanedQuery : ""));
+        }
+        const authToken = incomingAuthToken || sessionStorage.getItem("vehicleAppAuthToken") || "";
+
+        document.getElementById("apiInfo").textContent = apiBase || "(same origin)";
+
+        function setStatus(text, ok) {
+          const el = document.getElementById("statusDot");
+          if (!el) return;
+          el.textContent = text;
+          el.style.color = ok === false ? "#fecaca" : "";
+        }
+
+        let toastTimer = null;
+        function toast(msg) {
+          const el = document.getElementById("toast");
+          el.textContent = msg;
+          el.classList.add("show");
+          clearTimeout(toastTimer);
+          toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
+        }
+
+        async function api(path, options) {
+          const opts = options || {};
+          const headers = Object.assign(
+            { "Content-Type": "application/json" },
+            authToken ? { Authorization: "Bearer " + authToken } : {},
+            opts.headers || {}
+          );
+          const candidates = [apiBase];
+          // The public portal hostname can occasionally drop :3010 requests,
+          // while the NAS IP is reachable on the same intranet.
+          if (window.location.hostname.toLowerCase() === "3happs.com" && apiBase !== "http://192.168.5.103:3010") {
+            candidates.push("http://192.168.5.103:3010");
+          }
+          let lastError = null;
+          for (const candidate of candidates) {
+            try {
+              const res = await fetch(candidate + path, Object.assign({}, opts, {
+                headers,
+                credentials: "include",
+              }));
+              let data = {};
+              try { data = await res.json(); } catch (_) { data = {}; }
+              if (!res.ok) throw new Error((data && (data.error || data.message)) || ("Request failed (" + res.status + ")"));
+              apiBase = candidate;
+              return data;
+            } catch (error) {
+              lastError = error;
+            }
+          }
+          throw lastError || new Error("Request failed");
+        }
+
+        function escapeHtml(s) {
+          return String(s == null ? "" : s)
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+        }
+
+        // --- Tabs ------------------------------------------------------------
+        document.querySelectorAll(".tab-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+            document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
+            btn.classList.add("active");
+            document.getElementById("panel-" + btn.dataset.tab).classList.add("active");
+            if (btn.dataset.tab === "ai") refreshAiStatus();
+            if (btn.dataset.tab === "entries") loadEntries();
+            if (btn.dataset.tab === "logsassistant") loadLogsAssistantFolder();
+            if (btn.dataset.tab === "settings") { loadSettings(); loadAudioStatus(); startAudioStatusPolling(); }
+            else { stopAudioStatusPolling(); }
+          });
+        });
+
+        // --- Live (processed) view ------------------------------------------
+        let processedItems = [];
+        const liveSelectedIds = new Set();
+        function localDateValue(date = new Date()) {
+          const pad = (number) => String(number).padStart(2, "0");
+          return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
+        }
+        function resetLiveDatesToToday() {
+          const today = localDateValue();
+          document.getElementById("liveDateFrom").value = today;
+          document.getElementById("liveDateTo").value = today;
+        }
+        resetLiveDatesToToday();
+        function isLiveAudioPlaying() {
+          return Array.from(document.querySelectorAll("#liveList audio")).some((audio) => !audio.paused && !audio.ended);
+        }
+        function liveDateOf(it) {
+          const s = String(it.sourceTimestamp || it.processedAt || "").trim();
+          const m = s.match(/\d{4}-\d{2}-\d{2}/);
+          return m ? m[0] : "";
+        }
+        function populateChannels() {
+          const sel = document.getElementById("liveChannel");
+          const current = sel.value;
+          const channels = Array.from(new Set(processedItems.map((i) => i.channel).filter(Boolean))).sort();
+          sel.innerHTML = '<option value="">All</option>' +
+            channels.map((c) => '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + "</option>").join("");
+          sel.value = current;
+        }
+        function filteredProcessed() {
+          const ch = document.getElementById("liveChannel").value;
+          const from = document.getElementById("liveDateFrom").value;
+          const to = document.getElementById("liveDateTo").value;
+          const showNoConversation = document.getElementById("liveShowNoConversation").checked;
+          return processedItems.filter((it) => {
+            if (!showNoConversation && !String(it.content || "").trim()) return false;
+            if (ch && it.channel !== ch) return false;
+            const d = liveDateOf(it);
+            if (from && d && d < from) return false;
+            if (to && d && d > to) return false;
+            return true;
+          });
+        }
+        function formatSavedTimestamp(value) {
+          const raw = String(value || "").trim();
+          if (!raw) return "";
+          const parsed = new Date(/Z$|[+-]\d{2}:?\d{2}$/i.test(raw) ? raw : raw.replace(" ", "T") + "Z");
+          if (Number.isNaN(parsed.getTime())) return raw;
+          const pad = (number) => String(number).padStart(2, "0");
+          return parsed.getFullYear() + "-" + pad(parsed.getMonth() + 1) + "-" + pad(parsed.getDate()) +
+            " " + pad(parsed.getHours()) + ":" + pad(parsed.getMinutes()) + ":" + pad(parsed.getSeconds());
+        }
+        function liveItemMetaHtml(it) {
+          const badge = it.source === "live"
+            ? '<span class="badge live">LIVE</span>'
+            : '<span class="badge">FILE</span>';
+          const chip = it.channel ? '<span class="badge">' + escapeHtml(it.channel) + "</span>" : "";
+          const selected = liveSelectedIds.has(String(it.id)) ? " checked" : "";
+          return '<label style="display:flex;align-items:center;gap:6px">' +
+            '<input type="checkbox" data-role="live-select"' + selected + ' /> Select</label>' +
+            badge + chip +
+            '<span>' + escapeHtml(it.sourceTimestamp || it.filename) + '</span>' +
+            '<span>saved ' + escapeHtml(formatSavedTimestamp(it.processedAt)) + '</span>';
+        }
+        function liveItemSig(it) {
+          return it.id + ":" + it.source + ":" + (it.channel || "") + ":" +
+            (it.filename || "") + ":" + (it.processedAt || "") + ":" + (it.content || "").length;
+        }
+        function processedSourceTimestamp(item) {
+          const values = [item.sourceTimestamp, item.filename, item.content];
+          for (const value of values) {
+            const match = String(value || "").match(
+              /(\d{4}-\d{2}-\d{2})[ T](\d{2})[-:.](\d{2})[-:.](\d{2})/
+            );
+            if (match) return match[1] + " " + match[2] + ":" + match[3] + ":" + match[4];
+          }
+          return "";
+        }
+        function processedTranscriptContent(item) {
+          return String(item.content || "").replace(/^\s*\[[^\]]+\]\s*/, "").trim();
+        }
+        function buildLiveItem(it) {
+          const li = document.createElement("li");
+          li.className = "item";
+          li.dataset.id = it.id;
+          li.dataset.sig = liveItemSig(it);
+          let audio = "";
+          if (it.source !== "live" && it.filename) {
+            const src = apiBase + "/api/stt/audio/file?name=" + encodeURIComponent(it.filename) +
+              (authToken ? "&token=" + encodeURIComponent(authToken) : "");
+            audio = '<audio class="item-audio" controls preload="none" src="' + escapeHtml(src) + '"></audio>';
+          }
+          li.innerHTML =
+            '<div class="item-meta">' + liveItemMetaHtml(it) + '</div>' +
+            '<div class="item-content" data-role="content">' + escapeHtml(it.content) + '</div>' +
+            audio +
+            '<div class="row">' +
+              '<button class="btn secondary small" data-act="edit">Edit</button>' +
+              '<button class="btn ok small" data-act="add-entry">Add to Key Occurrences</button>' +
+            '</div>';
+          return li;
+        }
+        function renderProcessed() {
+          const list = document.getElementById("liveList");
+          const empty = document.getElementById("liveEmpty");
+          const items = filteredProcessed();
+          empty.style.display = items.length ? "none" : "";
+          const desired = new Set(items.map((it) => String(it.id)));
+          Array.from(liveSelectedIds).forEach((id) => {
+            if (!desired.has(id)) liveSelectedIds.delete(id);
+          });
+          document.getElementById("liveBulkBar").style.display = items.length ? "" : "none";
+
+          // Incrementally reconcile the DOM so existing rows (and any playing
+          // <audio> or open editor) are never recreated when new files arrive.
+          const existing = new Map();
+          Array.from(list.children).forEach((li) => existing.set(li.dataset.id, li));
+          for (const [id, li] of existing) {
+            if (!desired.has(id)) { li.remove(); existing.delete(id); }
+          }
+          items.forEach((it, index) => {
+            const id = String(it.id);
+            let li = existing.get(id);
+            if (!li) {
+              li = buildLiveItem(it);
+              existing.set(id, li);
+            } else if (li.dataset.editing !== "1" && li.dataset.sig !== liveItemSig(it)) {
+              li.dataset.sig = liveItemSig(it);
+              const metaEl = li.querySelector(".item-meta");
+              if (metaEl) metaEl.innerHTML = liveItemMetaHtml(it);
+              const contentEl = li.querySelector('[data-role="content"]');
+              if (contentEl) contentEl.textContent = it.content;
+            }
+            const atPos = list.children[index] || null;
+            if (li !== atPos) list.insertBefore(li, atPos);
+          });
+          updateLiveSelection();
+        }
+        async function loadProcessed(force = false) {
+          // Keep the transcript list stable while the user listens to a comms
+          // clip; automatic polling must not move text they are reading.
+          if (!force && isLiveAudioPlaying()) return;
+          try {
+            const from = document.getElementById("liveDateFrom").value;
+            const to = document.getElementById("liveDateTo").value;
+            const query = new URLSearchParams();
+            if (from) query.set("from", from);
+            if (to) query.set("to", to);
+            const data = await api("/api/stt/processed" + (query.size ? "?" + query.toString() : ""));
+            processedItems = data.items || [];
+            populateChannels();
+            renderProcessed();
+          } catch (err) {
+            setStatus("Error", false);
+            toast(err.message);
+          }
+        }
+        document.getElementById("liveChannel").addEventListener("change", renderProcessed);
+        document.getElementById("liveDateFrom").addEventListener("change", () => loadProcessed(true));
+        document.getElementById("liveDateTo").addEventListener("change", () => loadProcessed(true));
+        document.getElementById("liveShowNoConversation").addEventListener("change", renderProcessed);
+        document.getElementById("liveFilterClear").addEventListener("click", () => {
+          document.getElementById("liveChannel").value = "";
+          resetLiveDatesToToday();
+          document.getElementById("liveShowNoConversation").checked = false;
+          loadProcessed(true);
+        });
+
+        function updateLiveSelection() {
+          const boxes = Array.from(document.querySelectorAll('#liveList [data-role="live-select"]'));
+          const selected = boxes.filter((box) => box.checked);
+          document.getElementById("liveSelectedCount").textContent = selected.length + " selected";
+          document.getElementById("liveAddSelected").disabled = selected.length === 0;
+          const selectAll = document.getElementById("liveSelectAll");
+          selectAll.checked = boxes.length > 0 && selected.length === boxes.length;
+          selectAll.indeterminate = selected.length > 0 && selected.length < boxes.length;
+        }
+        document.getElementById("liveList").addEventListener("change", (e) => {
+          if (!e.target.matches('[data-role="live-select"]')) return;
+          const li = e.target.closest(".item");
+          if (!li) return;
+          if (e.target.checked) liveSelectedIds.add(li.dataset.id);
+          else liveSelectedIds.delete(li.dataset.id);
+          updateLiveSelection();
+        });
+        document.getElementById("liveSelectAll").addEventListener("change", (e) => {
+          document.querySelectorAll('#liveList .item').forEach((li) => {
+            const checkbox = li.querySelector('[data-role="live-select"]');
+            if (!checkbox) return;
+            checkbox.checked = e.target.checked;
+            if (e.target.checked) liveSelectedIds.add(li.dataset.id);
+            else liveSelectedIds.delete(li.dataset.id);
+          });
+          updateLiveSelection();
+        });
+        document.getElementById("liveAddSelected").addEventListener("click", async () => {
+          const selected = filteredProcessed().filter((item) => liveSelectedIds.has(String(item.id)));
+          if (!selected.length) return;
+          if (!confirm("Add " + selected.length + " displayed transcription(s) to Key Occurrences?")) return;
+          const button = document.getElementById("liveAddSelected");
+          button.disabled = true;
+          let added = 0;
+          let alreadyAdded = 0;
+          let failed = 0;
+          for (const item of selected) {
+            try {
+              await api("/api/stt/report/entries", {
+                method: "POST",
+                body: JSON.stringify({
+                  processedId: item.id,
+                  content: processedTranscriptContent(item),
+                  sourceTimestamp: processedSourceTimestamp(item),
+                }),
+              });
+              added++;
+              liveSelectedIds.delete(String(item.id));
+            } catch (err) {
+              if (/already in Key SO Occurrences/i.test(err.message)) {
+                alreadyAdded++;
+                liveSelectedIds.delete(String(item.id));
+              } else {
+                failed++;
+              }
+            }
+          }
+          renderProcessed();
+          toast(
+            "Added " + added + " to Key Occurrences" +
+            (alreadyAdded ? "; " + alreadyAdded + " already added" : "") +
+            (failed ? "; " + failed + " failed" : "")
+          );
+        });
+
+        document.getElementById("liveList").addEventListener("click", async (e) => {
+          const btn = e.target.closest("button[data-act]");
+          if (!btn) return;
+          const li = btn.closest(".item");
+          const id = li.dataset.id;
+          const act = btn.dataset.act;
+          if (act === "add-entry") {
+            const item = processedItems.find((processed) => String(processed.id) === String(id));
+            if (!item) { toast("Transcript is no longer available. Refresh and try again."); return; }
+            btn.disabled = true;
+            try {
+              await api("/api/stt/report/entries", {
+                method: "POST",
+                body: JSON.stringify({
+                  processedId: item.id,
+                  content: processedTranscriptContent(item),
+                  sourceTimestamp: processedSourceTimestamp(item),
+                }),
+              });
+              toast("Added to Key Occurrences with transcript timestamp");
+            } catch (err) {
+              toast(err.message);
+            } finally {
+              btn.disabled = false;
+            }
+          } else if (act === "edit") {
+            const contentEl = li.querySelector('[data-role="content"]');
+            if (li.dataset.editing === "1") {
+              const ta = li.querySelector("textarea");
+              const value = ta.value;
+              try {
+                await api("/api/stt/processed/" + id, { method: "PATCH", body: JSON.stringify({ editedContent: value }) });
+                toast("Saved");
+                // Exit edit mode: restore the content div so the row shrinks
+                // back (renderProcessed skips rows still flagged editing).
+                const restored = document.createElement("div");
+                restored.className = "item-content";
+                restored.setAttribute("data-role", "content");
+                restored.textContent = value;
+                ta.replaceWith(restored);
+                btn.textContent = "Edit";
+                btn.classList.remove("ok"); btn.classList.add("secondary");
+                li.dataset.editing = "";
+                li.dataset.sig = "";
+                loadProcessed();
+              } catch (err) { toast(err.message); }
+            } else {
+              li.dataset.editing = "1";
+              const current = contentEl.textContent;
+              const ta = document.createElement("textarea");
+              ta.className = "edit-area";
+              ta.value = current;
+              ta.rows = Math.min(8, Math.max(2, current.split("\n").length));
+              contentEl.replaceWith(ta);
+              btn.textContent = "Save";
+              btn.classList.remove("secondary"); btn.classList.add("ok");
+            }
+          }
+        });
+
+        // Keyboard shortcuts for the processed list: Ctrl+E edits the active row
+        // (last clicked, else the top row), Ctrl+S saves the row being edited.
+        let activeLiveId = null;
+        document.getElementById("liveList").addEventListener("click", (e) => {
+          const li = e.target.closest(".item");
+          if (!li) return;
+          activeLiveId = li.dataset.id;
+          const list = document.getElementById("liveList");
+          list.querySelectorAll(".item.active-row").forEach((el) => el.classList.remove("active-row"));
+          li.classList.add("active-row");
+        });
+        document.addEventListener("keydown", (e) => {
+          if (!(e.ctrlKey || e.metaKey)) return;
+          const key = e.key.toLowerCase();
+          if (key !== "e" && key !== "s") return;
+          const list = document.getElementById("liveList");
+          if (!list || list.offsetParent === null) return; // only when Live tab is visible
+          if (key === "s") {
+            const target = list.querySelector('.item[data-editing="1"]');
+            if (target) { e.preventDefault(); target.querySelector('button[data-act="edit"]').click(); }
+            return;
+          }
+          // Ctrl+E
+          let li = activeLiveId ? list.querySelector('.item[data-id="' + activeLiveId + '"]') : null;
+          if (!li) li = list.querySelector(".item");
+          if (li && li.dataset.editing !== "1") {
+            e.preventDefault();
+            li.querySelector('button[data-act="edit"]').click();
+            const ta = li.querySelector("textarea");
+            if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+          }
+        });
+
+        // --- Raw view --------------------------------------------------------
+        // Persist checkbox selection across auto-refreshes (poll re-renders list).
+        const rawSelectedIds = new Set();
+        async function loadRaw() {
+          const list = document.getElementById("rawList");
+          const empty = document.getElementById("rawEmpty");
+          try {
+            const data = await api("/api/stt/raw");
+            const items = data.items || [];
+            document.getElementById("rawCount").textContent = String(items.length);
+            empty.style.display = items.length ? "none" : "";
+            list.innerHTML = items.map((it) => (
+              '<li class="item" data-id="' + it.id + '">' +
+                '<div class="item-meta">' +
+                  '<label style="display:flex;align-items:center;gap:6px">' +
+                    '<input type="checkbox" data-role="raw-select" /> ' +
+                    '<span>' + escapeHtml(it.filename) + '</span>' +
+                  '</label>' +
+                  '<span>' + escapeHtml(it.sourceTimestamp || "") + '</span>' +
+                '</div>' +
+                '<textarea data-role="raw-content">' + escapeHtml(it.content) + '</textarea>' +
+                '<div class="row">' +
+                  '<button class="btn ok small" data-act="save">Save to Processed</button>' +
+                  '<button class="btn danger small" data-act="discard">Discard</button>' +
+                '</div>' +
+              '</li>'
+            )).join("");
+            // Drop remembered ids that no longer exist, then restore checkboxes.
+            const liveIds = new Set(items.map((it) => String(it.id)));
+            Array.from(rawSelectedIds).forEach((id) => { if (!liveIds.has(id)) rawSelectedIds.delete(id); });
+            list.querySelectorAll(".item").forEach((li) => {
+              const cb = li.querySelector('[data-role="raw-select"]');
+              if (cb) cb.checked = rawSelectedIds.has(li.dataset.id);
+            });
+            document.getElementById("rawBulkBar").style.display = items.length ? "" : "none";
+            updateRawSelection();
+          } catch (err) {
+            setStatus("Error", false);
+            toast(err.message);
+          }
+        }
+
+        document.getElementById("rawList").addEventListener("click", async (e) => {
+          const btn = e.target.closest("button[data-act]");
+          if (!btn) return;
+          const li = btn.closest(".item");
+          const id = li.dataset.id;
+          const act = btn.dataset.act;
+          if (act === "save") {
+            const value = li.querySelector('[data-role="raw-content"]').value;
+            try {
+              await api("/api/stt/raw/" + id + "/save", { method: "POST", body: JSON.stringify({ editedContent: value }) });
+              toast("Saved to processed"); loadRaw(); loadProcessed();
+            } catch (err) { toast(err.message); }
+          } else if (act === "discard") {
+            if (!confirm("Discard this raw transcription?")) return;
+            try { await api("/api/stt/raw/" + id + "/delete", { method: "POST" }); toast("Discarded"); loadRaw(); }
+            catch (err) { toast(err.message); }
+          }
+        });
+
+        // Bulk selection: keep the "select all" state and count in sync.
+        function updateRawSelection() {
+          const boxes = Array.from(document.querySelectorAll('#rawList [data-role="raw-select"]'));
+          const selected = boxes.filter((b) => b.checked);
+          const countEl = document.getElementById("rawSelectedCount");
+          if (countEl) countEl.textContent = selected.length + " selected";
+          const addBtn = document.getElementById("rawAddSelected");
+          if (addBtn) addBtn.disabled = selected.length === 0;
+          const all = document.getElementById("rawSelectAll");
+          if (all) {
+            all.checked = boxes.length > 0 && selected.length === boxes.length;
+            all.indeterminate = selected.length > 0 && selected.length < boxes.length;
+          }
+        }
+        document.getElementById("rawList").addEventListener("change", (e) => {
+          if (e.target.matches('[data-role="raw-select"]')) {
+            const li = e.target.closest(".item");
+            if (li) { if (e.target.checked) rawSelectedIds.add(li.dataset.id); else rawSelectedIds.delete(li.dataset.id); }
+            updateRawSelection();
+          }
+        });
+        document.getElementById("rawSelectAll").addEventListener("change", (e) => {
+          document.querySelectorAll('#rawList .item').forEach((li) => {
+            const b = li.querySelector('[data-role="raw-select"]');
+            if (b) { b.checked = e.target.checked; }
+            if (e.target.checked) rawSelectedIds.add(li.dataset.id); else rawSelectedIds.delete(li.dataset.id);
+          });
+          updateRawSelection();
+        });
+        document.getElementById("rawAddSelected").addEventListener("click", async () => {
+          const selected = Array.from(document.querySelectorAll("#rawList .item"))
+            .filter((li) => { const cb = li.querySelector('[data-role="raw-select"]'); return cb && cb.checked; });
+          if (!selected.length) return;
+          if (!confirm("Add " + selected.length + " transcription(s) to Processed?")) return;
+          const addBtn = document.getElementById("rawAddSelected");
+          addBtn.disabled = true;
+          let ok = 0, fail = 0;
+          for (const li of selected) {
+            const id = li.dataset.id;
+            const value = li.querySelector('[data-role="raw-content"]').value;
+            try {
+              await api("/api/stt/raw/" + id + "/save", { method: "POST", body: JSON.stringify({ editedContent: value }) });
+              ok++;
+            } catch (_) { fail++; }
+          }
+          toast("Added " + ok + " to processed" + (fail ? ", " + fail + " failed" : ""));
+          loadRaw(); loadProcessed();
+        });
+
+        document.getElementById("rawDiscardAll").addEventListener("click", async () => {
+          const items = Array.from(document.querySelectorAll("#rawList .item"));
+          if (!items.length) return;
+          if (!confirm("Discard all " + items.length + " raw transcription(s)? This cannot be undone.")) return;
+          const btn = document.getElementById("rawDiscardAll");
+          btn.disabled = true;
+          let ok = 0, fail = 0;
+          for (const li of items) {
+            try {
+              await api("/api/stt/raw/" + li.dataset.id + "/delete", { method: "POST" });
+              ok++;
+            } catch (_) { fail++; }
+          }
+          rawSelectedIds.clear();
+          toast("Discarded " + ok + (fail ? ", " + fail + " failed" : ""));
+          btn.disabled = false;
+          loadRaw();
+        });
+
+        document.getElementById("scanBtn").addEventListener("click", async () => {
+          try { const r = await api("/api/stt/scan", { method: "POST" }); toast("Ingested " + r.ingested + " file(s)"); loadRaw(); }
+          catch (err) { toast(err.message); }
+        });
+        document.getElementById("refreshRaw").addEventListener("click", loadRaw);
+        document.getElementById("refreshLive").addEventListener("click", () => loadProcessed(true));
+
+        // Build Ops-report rows from processed transcripts, matching the desktop
+        // app: one row per transcript line, leading [filename] tag stripped, time
+        // as "HHMM hrs" from the timestamp, sorted ascending. (_build_ops_report_structured)
+        function processedReportRows(items) {
+          // Parse "YYYY-MM-DD HH-MM-SS" (dashes, as stored) or colon variants.
+          const parseTs = (s) => {
+            let m = String(s || "").match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2})[-:.](\d{2})[-:.](\d{2})/);
+            if (m) return { hhmm: m[4] + ":" + m[5] + ":" + m[6], key: m[1] + m[2] + m[3] + m[4] + m[5] + m[6] };
+            m = String(s || "").match(/(\d{2})[-:.](\d{2})[-:.](\d{2})/);
+            if (m) return { hhmm: m[1] + ":" + m[2] + ":" + m[3], key: m[1] + m[2] + m[3] };
+            return { hhmm: "", key: String(s || "") };
+          };
+          const rows = [];
+          (items || []).forEach((it) => {
+            const src = it.sourceTimestamp || it.filename || it.processedAt || "";
+            const parsed = parseTs(src);
+            String(it.content || "").split(/\r?\n/).forEach((line) => {
+              const movements = line.replace(/^\s*\[[^\]]+\]\s*/, "").trim();
+              if (!movements) return;
+              rows.push({ time: parsed.hhmm, movements, key: parsed.key });
+            });
+          });
+          rows.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+          return rows.map((r) => ({ time: r.time, movements: r.movements }));
+        }
+        // Export the currently-shown processed transcripts to the Word report.
+        document.getElementById("liveExportDocx").addEventListener("click", () => {
+          const rows = processedReportRows(filteredProcessed());
+          if (!rows.length) { toast("No processed transcriptions to export."); return; }
+          const opsReference = document.getElementById("liveOpsRef").value.trim();
+          const subject = document.getElementById("liveSubject").value.trim();
+          const doValue = document.getElementById("liveDO").value.trim();
+          const missing = [];
+          if (!opsReference) missing.push("Ops Reference");
+          if (!subject) missing.push("Name / Entity");
+          if (!doValue) missing.push("DO");
+          if (missing.length) { toast("Required: " + missing.join(", ")); return; }
+          const from = document.getElementById("liveDateFrom").value;
+          let date = new Date().toISOString().slice(0, 10);
+          if (from) date = from;
+          const parts = date.split("-");
+          const dateOut = parts.length === 3 ? parts[2] + "/" + parts[1] + "/" + parts[0] : date;
+          downloadLiveDocx(rows, { opsReference, subject, do: doValue, date: dateOut });
+        });
+
+        // --- Live routing mode (Start/Stop): send transcriptions straight here
+        let liveModeActive = false;
+        function renderLiveMode() {
+          const btn = document.getElementById("liveStart");
+          btn.textContent = liveModeActive ? "■ Stop live" : "▶ Start live";
+          btn.classList.toggle("danger", liveModeActive);
+          document.getElementById("liveModeInfo").textContent =
+            liveModeActive ? "Live routing ON — new transcriptions appear here" : "";
+        }
+        async function loadLiveMode() {
+          try { const s = await api("/api/stt/live/mode"); liveModeActive = !!s.active; renderLiveMode(); }
+          catch (_) { /* ignore */ }
+        }
+        document.getElementById("liveStart").addEventListener("click", async () => {
+          const next = !liveModeActive;
+          try {
+            const r = await api("/api/stt/live/mode", { method: "POST", body: JSON.stringify({ active: next }) });
+            liveModeActive = !!r.active;
+            renderLiveMode();
+            toast(liveModeActive ? "Live routing started" : "Live routing stopped");
+            if (liveModeActive) loadProcessed();
+          } catch (err) { toast(err.message); }
+        });
+
+        // --- AI Assistant ----------------------------------------------------
+        const aiPrompt = document.getElementById("aiPrompt");
+        const aiAsk = document.getElementById("aiAsk");
+        const aiClear = document.getElementById("aiClear");
+        const aiBusy = document.getElementById("aiBusy");
+        const aiAnswer = document.getElementById("aiAnswer");
+        const aiAnswerCard = document.getElementById("aiAnswerCard");
+        const aiStatus = document.getElementById("aiStatus");
+        const aiChatHistory = [];
+
+        async function refreshAiStatus() {
+          try {
+            const s = await api("/api/stt/ai/health");
+            aiStatus.textContent = s.ready ? (s.status || "Model loaded") : (s.status || "AI service offline");
+            aiStatus.style.color = s.ready ? "var(--ok)" : "var(--muted)";
+          } catch (_) {
+            aiStatus.textContent = "AI service offline";
+          }
+        }
+
+        aiClear.addEventListener("click", () => {
+          aiPrompt.value = "";
+          aiAnswerCard.style.display = "none";
+          aiAnswer.textContent = "";
+          aiChatHistory.length = 0;
+          toast("Chat history cleared");
+        });
+
+        aiAsk.addEventListener("click", async () => {
+          const prompt = aiPrompt.value.trim();
+          if (!prompt) { toast("Enter a question first"); return; }
+          const mode = document.querySelector('input[name="aiMode"]:checked').value;
+          aiAsk.disabled = true;
+          aiBusy.style.display = "";
+          try {
+            const path = mode === "logs" ? "/api/stt/ai/logs"
+              : mode === "sodraft" ? "/api/stt/ai/sodraft"
+              : "/api/stt/ai/general";
+            const body = { prompt };
+            if (mode === "general") {
+              body.mode = "chat";
+              body.history = aiChatHistory;
+            }
+            if (mode === "sodraft") {
+              // Use the exact list currently shown in Key SO Occurences.
+              body.entries = filteredReportEntries().map((item) => ({
+                filename: item.filename || "",
+                content: item.content || "",
+                sourceTimestamp: item.sourceTimestamp || "",
+              }));
+            }
+            const r = await api(path, { method: "POST", body: JSON.stringify(body) });
+            aiAnswer.textContent = r.answer || "(no answer)";
+            aiAnswerCard.style.display = "";
+            if (mode === "general" && r.answer) {
+              aiChatHistory.push({ prompt, answer: r.answer });
+              if (aiChatHistory.length > 6) aiChatHistory.shift();
+            }
+            if (r.status) { aiStatus.textContent = r.status; aiStatus.style.color = "var(--ok)"; }
+          } catch (err) {
+            aiAnswer.textContent = err.message;
+            aiAnswerCard.style.display = "";
+          } finally {
+            aiAsk.disabled = false;
+            aiBusy.style.display = "none";
+          }
+        });
+
+        // --- Logs Assistant ------------------------------------------------
+        const logsAssistantFolder = document.getElementById("logsAssistantFolder");
+        const logsAssistantStatus = document.getElementById("logsAssistantStatus");
+        const logsAssistantFiles = document.getElementById("logsAssistantFiles");
+        const logsAssistantKeywords = document.getElementById("logsAssistantKeywords");
+        const logsAssistantPrompt = document.getElementById("logsAssistantPrompt");
+        const logsAssistantAnswer = document.getElementById("logsAssistantAnswer");
+        const logsAssistantAsk = document.getElementById("logsAssistantAsk");
+        const logsAssistantBusy = document.getElementById("logsAssistantBusy");
+
+        async function loadLogsAssistantFolder() {
+          try {
+            const settings = await api("/api/stt/settings");
+            if (!logsAssistantFolder.value.trim()) logsAssistantFolder.value = settings.logsAssistantFolder || "";
+          } catch (_) { /* The tab will show the API error when scanning. */ }
+        }
+        async function scanLogsAssistantFolder() {
+          const folder = logsAssistantFolder.value.trim();
+          if (!folder) { toast("Choose a reports folder first"); return; }
+          logsAssistantStatus.textContent = "Scanning…";
+          logsAssistantFiles.textContent = "";
+          logsAssistantAnswer.textContent = "";
+          logsAssistantAnswer.style.display = "none";
+          try {
+            const result = await api("/api/stt/logs-assistant/scan", { method: "POST", body: JSON.stringify({ folder }) });
+            logsAssistantFolder.value = result.folder || folder;
+            logsAssistantStatus.textContent = (result.documentCount || 0) + " report(s) indexed";
+          } catch (err) {
+            logsAssistantStatus.textContent = "";
+            toast(err.message);
+          }
+        }
+        document.getElementById("logsAssistantScan").addEventListener("click", scanLogsAssistantFolder);
+        function highlightLogKeywords(text, keywords) {
+          const searchText = keywords.trim();
+          const words = searchText.match(/[a-z0-9]+/gi) || [];
+          if (!words.length) return escapeHtml(text);
+          const escapedWords = words.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+          const dateMatch = /^(\d{1,2})[\s/._-]+(\d{1,2})[\s/._-]+(\d{2}|\d{4})$/.exec(searchText);
+          const dateYearPattern = dateMatch
+            ? (dateMatch[3].length === 2 ? "(?:20)?" + dateMatch[3] : "(?:" + dateMatch[3] + "|" + dateMatch[3].slice(-2) + ")")
+            : "";
+          const pattern = dateMatch
+            ? new RegExp(
+              "(\\b0?" + Number(dateMatch[1]) + "[\\s/._-]+0?" + Number(dateMatch[2]) +
+              "[\\s/._-]+" + dateYearPattern + "\\b)",
+              "gi"
+            )
+            : new RegExp("(" + escapedWords.join("\\s+") + ")", "gi");
+          let html = "";
+          let lastIndex = 0;
+          let match;
+          while ((match = pattern.exec(text)) !== null) {
+            html += escapeHtml(text.slice(lastIndex, match.index));
+            html += "<mark>" + escapeHtml(match[0]) + "</mark>";
+            lastIndex = match.index + match[0].length;
+          }
+          return html + escapeHtml(text.slice(lastIndex));
+        }
+        async function openLogsAssistantFile(filename, fullPath, triggerEl) {
+          if (!filename && !fullPath) return;
+          const body = fullPath ? { path: fullPath } : { folder: logsAssistantFolder.value.trim(), filename };
+          if (!fullPath && !body.folder) return;
+          const originalText = triggerEl ? triggerEl.textContent : "";
+          if (triggerEl) {
+            triggerEl.textContent = originalText + " (opening…)";
+            triggerEl.style.pointerEvents = "none";
+            triggerEl.style.opacity = "0.6";
+          }
+          try {
+            const headers = Object.assign(
+              { "Content-Type": "application/json" },
+              authToken ? { Authorization: "Bearer " + authToken } : {}
+            );
+            const res = await fetch(apiBase + "/api/stt/logs-assistant/open", {
+              method: "POST", headers, credentials: "include", body: JSON.stringify(body),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error((data && data.error) || ("Request failed (" + res.status + ")"));
+            if (data && data.download && data.downloadUrl) {
+              // Headless server (no Word/GUI) — trigger a plain download via a
+              // hidden link click (no new tab/window): an anchor download
+              // click isn't treated as a popup, so it isn't blocked the way
+              // window.open can be, even after the awaits above.
+              const sep = data.downloadUrl.includes("?") ? "&" : "?";
+              const url = apiBase + data.downloadUrl + (authToken ? sep + "token=" + encodeURIComponent(authToken) : "");
+              const link = document.createElement("a");
+              link.href = url;
+              link.rel = "noopener";
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+              toast("Report downloaded");
+              return;
+            }
+          } catch (err) {
+            toast(err.message);
+          } finally {
+            if (triggerEl) {
+              triggerEl.textContent = originalText;
+              triggerEl.style.pointerEvents = "";
+              triggerEl.style.opacity = "";
+            }
+          }
+        }
+        logsAssistantAnswer.addEventListener("click", (event) => {
+          const header = event.target.closest("[data-open-file]");
+          if (!header) return;
+          openLogsAssistantFile(
+            header.getAttribute("data-open-file"),
+            header.getAttribute("data-open-path") || "",
+            header
+          );
+        });
+        logsAssistantAsk.addEventListener("click", async () => {
+          const folder = logsAssistantFolder.value.trim();
+          if (!folder) { toast("Choose and scan a reports folder first"); return; }
+          const keywords = logsAssistantKeywords.value.trim();
+          if (!keywords) { toast("Enter one or more keywords first"); return; }
+          logsAssistantAsk.disabled = true;
+          logsAssistantBusy.style.display = "";
+          logsAssistantAnswer.style.display = "none";
+          try {
+            const result = await api("/api/stt/logs-assistant/ask", { method: "POST", body: JSON.stringify({ folder, keywords }) });
+            logsAssistantAnswer.innerHTML = result.matches && result.matches.length
+              ? result.matches.map((match) => '<div style="margin-bottom:12px"><strong class="link" data-open-file="' + escapeHtml(match.filename) + '" data-open-path="' + escapeHtml(match.fullPath || "") + '" title="Click to open this file" style="cursor:pointer;text-decoration:underline">' + escapeHtml(match.filename) + '</strong><div>' + highlightLogKeywords(match.paragraph, keywords) + '</div></div>').join("")
+              : "No matching paragraphs found.";
+            logsAssistantAnswer.style.display = "";
+          } catch (err) { toast(err.message); }
+          finally {
+            logsAssistantAsk.disabled = false;
+            logsAssistantBusy.style.display = "none";
+          }
+        });
+
+        // --- Relevant SO Report Entries -------------------------------------
+        let reportEntries = [];
+        function entryDateOf(entry) {
+          const match = String((entry && entry.sourceTimestamp) || "").match(/\d{4}-\d{2}-\d{2}/);
+          return match ? match[0] : "";
+        }
+        function localDateValue() {
+          const now = new Date();
+          const pad = (value) => String(value).padStart(2, "0");
+          return now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate());
+        }
+        function filteredReportEntries() {
+          const from = document.getElementById("entriesDateFrom").value;
+          const to = document.getElementById("entriesDateTo").value;
+          return reportEntries.filter((entry) => {
+            const date = entryDateOf(entry);
+            if (!from && !to) return true;
+            if (from && (!date || date < from)) return false;
+            if (to && (!date || date > to)) return false;
+            return true;
+          });
+        }
+        function renderEntries() {
+          const entries = filteredReportEntries();
+          const list = document.getElementById("entriesList");
+          const empty = document.getElementById("entriesEmpty");
+          empty.style.display = entries.length ? "none" : "";
+          list.innerHTML = entries.map((it) => (
+            '<li class="item" data-id="' + it.id + '">' +
+              '<div class="item-meta">' +
+                '<span>' + escapeHtml(it.sourceTimestamp || "(no time set)") + '</span>' +
+              '</div>' +
+              '<div class="item-content" data-role="content">' + escapeHtml(it.content) + '</div>' +
+              '<div class="row">' +
+                '<button class="btn secondary small" data-act="edit">Edit</button>' +
+                '<button class="btn danger small" data-act="remove">Delete</button>' +
+              '</div>' +
+            '</li>'
+          )).join("");
+        }
+        // Normalize a datetime-local value ("2026-08-06T13:05") to "YYYY-MM-DD HH:MM:SS".
+        function entryTimeToStored(v) {
+          const s = String(v || "").trim();
+          if (!s) return "";
+          return s.replace("T", " ") + (s.length === 16 ? ":00" : "");
+        }
+        // Stored "YYYY-MM-DD HH:MM:SS" -> datetime-local "YYYY-MM-DDTHH:MM".
+        function entryTimeToInput(v) {
+          const s = String(v || "").trim();
+          const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
+          return m ? m[1] + "T" + m[2] : "";
+        }
+        // Current local time as datetime-local value with seconds ("YYYY-MM-DDTHH:MM:SS").
+        function nowLocalInput() {
+          const d = new Date();
+          const p = (n) => String(n).padStart(2, "0");
+          return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) +
+            "T" + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+        }
+        // Live auto-clock for the new-entry time field until the officer edits it.
+        let entryTimeAuto = true;
+        function setEntryTimeMode(auto) {
+          entryTimeAuto = auto;
+          const mode = document.getElementById("entryTimeMode");
+          if (mode) mode.textContent = auto ? "(live)" : "(manual)";
+        }
+        function tickEntryTime() {
+          if (entryTimeAuto) document.getElementById("entryTime").value = nowLocalInput();
+        }
+        (function initEntryTimeClock() {
+          tickEntryTime();
+          setInterval(tickEntryTime, 1000);
+          document.getElementById("entryTime").addEventListener("input", () => setEntryTimeMode(false));
+          document.getElementById("entryTimeNow").addEventListener("click", () => { setEntryTimeMode(true); tickEntryTime(); });
+        })();
+        async function loadEntries() {
+          try {
+            const data = await api("/api/stt/report/entries");
+            reportEntries = data.items || [];
+            renderEntries();
+          } catch (err) { toast(err.message); }
+        }
+        document.getElementById("entriesDateFrom").addEventListener("change", renderEntries);
+        document.getElementById("entriesDateTo").addEventListener("change", renderEntries);
+        document.getElementById("entriesFilterClear").addEventListener("click", () => {
+          document.getElementById("entriesDateFrom").value = "";
+          document.getElementById("entriesDateTo").value = "";
+          renderEntries();
+        });
+        document.getElementById("entriesList").addEventListener("click", async (e) => {
+          const btn = e.target.closest("button[data-act]");
+          if (!btn) return;
+          const li = btn.closest(".item");
+          const id = li.dataset.id;
+          const act = btn.dataset.act;
+          if (act === "remove") {
+            if (!confirm("Delete this entry?")) return;
+            try { await api("/api/stt/report/entries/" + id, { method: "DELETE" }); loadEntries(); }
+            catch (err) { toast(err.message); }
+          } else if (act === "edit") {
+            const entry = reportEntries.find((x) => String(x.id) === String(id));
+            if (li.dataset.editing === "1") {
+              const timeVal = entryTimeToStored(li.querySelector('input[type="datetime-local"]').value);
+              const contentVal = li.querySelector("textarea").value.trim();
+              if (!contentVal) { toast("Log content is required"); return; }
+              try {
+                await api("/api/stt/report/entries/" + id, {
+                  method: "PATCH",
+                  body: JSON.stringify({ content: contentVal, sourceTimestamp: timeVal }),
+                });
+                toast("Saved"); loadEntries();
+              } catch (err) { toast(err.message); }
+            } else {
+              li.dataset.editing = "1";
+              const meta = li.querySelector(".item-meta");
+              const sourceTimestamp = (entry && entry.sourceTimestamp) ||
+                processedSourceTimestamp({ content: entry && entry.content });
+              meta.innerHTML = '<input type="datetime-local" value="' + escapeHtml(entryTimeToInput(sourceTimestamp)) + '" />';
+              const contentEl = li.querySelector('[data-role="content"]');
+              const ta = document.createElement("textarea");
+              ta.value = entry ? entry.content : contentEl.textContent;
+              contentEl.replaceWith(ta);
+              btn.textContent = "Save";
+              btn.classList.remove("secondary"); btn.classList.add("ok");
+            }
+          }
+        });
+        async function addEntry() {
+          const content = document.getElementById("entryContent").value.trim();
+          if (!content) { toast("Enter the log content first"); return; }
+          const sourceTimestamp = entryTimeToStored(document.getElementById("entryTime").value);
+          try {
+            await api("/api/stt/report/entries", { method: "POST", body: JSON.stringify({ content, sourceTimestamp }) });
+            document.getElementById("entryContent").value = "";
+            setEntryTimeMode(true);
+            tickEntryTime();
+            toast("Entry added");
+            loadEntries();
+          } catch (err) { toast(err.message); }
+        }
+        document.getElementById("entryAdd").addEventListener("click", addEntry);
+        document.getElementById("entryContent").addEventListener("keydown", (e) => {
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addEntry(); }
+        });
+        document.getElementById("entriesRefresh").addEventListener("click", loadEntries);
+        document.getElementById("entriesClear").addEventListener("click", async () => {
+          if (!reportEntries.length) return;
+          if (!confirm("Clear all report entries?")) return;
+          try { await api("/api/stt/report/entries/clear", { method: "POST" }); loadEntries(); }
+          catch (err) { toast(err.message); }
+        });
+        // Key SO Occurences export: same SO Report format as the Live Transcript export.
+        document.getElementById("entriesExportDocx").addEventListener("click", () => {
+          const entries = filteredReportEntries()
+            .slice()
+            .sort((a, b) => String(a.sourceTimestamp || "").localeCompare(String(b.sourceTimestamp || "")));
+          if (!entries.length) { toast("No occurrences to export."); return; }
+          const rows = entries.map((it) => ({ time: reportTimeLabel(it.sourceTimestamp), movements: it.content }));
+          const opsReference = document.getElementById("entriesOpsRef").value.trim();
+          const subject = document.getElementById("entriesSubject").value.trim();
+          const doValue = document.getElementById("entriesDO").value.trim();
+          const missing = [];
+          if (!opsReference) missing.push("Ops Reference");
+          if (!subject) missing.push("Name / Entity");
+          if (!doValue) missing.push("DO");
+          if (missing.length) { toast("Required: " + missing.join(", ")); return; }
+          const from = document.getElementById("entriesDateFrom").value;
+          let date = new Date().toISOString().slice(0, 10);
+          if (from) date = from;
+          const parts = date.split("-");
+          const dateOut = parts.length === 3 ? parts[2] + "/" + parts[1] + "/" + parts[0] : date;
+          downloadLiveDocx(rows, { opsReference, subject, do: doValue, date: dateOut });
+        });
+
+        // --- Report table helpers -------------------------------------------
+        function reportTimeLabel(ts) {
+          const s = String(ts || "").trim();
+          const m = s.match(/(\d{2}):(\d{2}):?\d{0,2}/);
+          if (m) return m[1] + m[2] + " hrs";
+          return s;
+        }
+        function rowHtml(time, movements, remarks, rowId) {
+          const idAttr = rowId ? ' data-row-id="' + rowId + '"' : "";
+          return (
+            "<tr" + idAttr + ">" +
+              '<td contenteditable="true" data-col="time">' + escapeHtml(time) + "</td>" +
+              '<td contenteditable="true" data-col="movements">' + escapeHtml(movements) + "</td>" +
+              '<td contenteditable="true" data-col="remarks">' + escapeHtml(remarks) + "</td>" +
+              '<td><button class="btn danger small" data-act="delrow">&#10005;</button></td>' +
+            "</tr>"
+          );
+        }
+        function readRows(tbodyId) {
+          return Array.from(document.querySelectorAll("#" + tbodyId + " tr")).map((tr) => ({
+            id: tr.dataset.rowId ? Number(tr.dataset.rowId) : 0,
+            time: tr.querySelector('[data-col="time"]').textContent.trim(),
+            movements: tr.querySelector('[data-col="movements"]').textContent.trim(),
+            remarks: tr.querySelector('[data-col="remarks"]').textContent.trim(),
+          }));
+        }
+        function bindRowDelete(tbodyId) {
+          document.getElementById(tbodyId).addEventListener("click", (e) => {
+            const b = e.target.closest("button[data-act='delrow']");
+            if (b) b.closest("tr").remove();
+          });
+        }
+        bindRowDelete("repRows");
+        bindRowDelete("airRows");
+
+        async function downloadDocx(rows, meta) {
+          try {
+            const res = await fetch(apiBase + "/api/stt/report/live-docx", {
+              method: "POST",
+              headers: Object.assign({ "Content-Type": "application/json" },
+                authToken ? { Authorization: "Bearer " + authToken } : {}),
+              credentials: "include",
+              body: JSON.stringify(Object.assign({ rows, opsReference: meta.refNo }, meta)),
+            });
+            if (!res.ok) {
+              let msg = "Download failed (" + res.status + ")";
+              try { const j = await res.json(); if (j && j.error) msg = j.error; } catch (_) {}
+              throw new Error(msg);
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = "operation_report.docx";
+            document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(url);
+            toast("Report downloaded");
+          } catch (err) { toast(err.message); }
+        }
+
+        // Live Transcript View export: builds the SO Report format (Ops Reference /
+        // Subject Name / Date / DO header + light-blue Time | Movement table).
+        async function downloadLiveDocx(rows, meta) {
+          try {
+            const res = await fetch(apiBase + "/api/stt/report/live-docx", {
+              method: "POST",
+              headers: Object.assign({ "Content-Type": "application/json" },
+                authToken ? { Authorization: "Bearer " + authToken } : {}),
+              credentials: "include",
+              body: JSON.stringify(Object.assign({ rows }, meta)),
+            });
+            if (!res.ok) {
+              let msg = "Download failed (" + res.status + ")";
+              try { const j = await res.json(); if (j && j.error) msg = j.error; } catch (_) {}
+              throw new Error(msg);
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = "operation_report.docx";
+            document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(url);
+            toast("Report downloaded");
+          } catch (err) { toast(err.message); }
+        }
+
+        // --- SO Report Draft tab --------------------------------------------
+        document.getElementById("repBuild")?.addEventListener("click", async () => {
+          await loadEntries();
+          document.getElementById("repRows").innerHTML =
+            reportEntries.map((it) => rowHtml(reportTimeLabel(it.sourceTimestamp), it.content, "")).join("");
+          if (!reportEntries.length) toast("No entries — add lines from the Live view first.");
+        });
+        document.getElementById("repAddRow").addEventListener("click", () => {
+          document.getElementById("repRows").insertAdjacentHTML("beforeend", rowHtml("", "", ""));
+        });
+        function repMeta() {
+          return {
+            refNo: document.getElementById("repRef").value.trim(),
+            subject: document.getElementById("repSubject").value.trim(),
+            date: document.getElementById("repDate").value.trim(),
+          };
+        }
+        document.getElementById("repSummary").addEventListener("click", async () => {
+          const busy = document.getElementById("repBusy");
+          busy.style.display = "";
+          try {
+            const r = await api("/api/stt/report/summary", { method: "POST", body: JSON.stringify(repMeta()) });
+            document.getElementById("repSummaryText").textContent = r.answer || "(no summary)";
+            document.getElementById("repSummaryCard").style.display = "";
+          } catch (err) { toast(err.message); }
+          finally { busy.style.display = "none"; }
+        });
+        document.getElementById("repDownload").addEventListener("click", () => {
+          downloadDocx(readRows("repRows"), repMeta());
+        });
+
+        // --- AI SO Report Draft tab -----------------------------------------
+        let airReportRows = [];
+        function airMeta() {
+          return {
+            refNo: document.getElementById("airRef").value.trim(),
+            subject: document.getElementById("airSubject").value.trim(),
+            date: document.getElementById("airDate").value.trim(),
+          };
+        }
+        function airRowDate(row) {
+          const match = String((row && (row.timeStart || row.timeEnd || row.time)) || "").match(/\d{4}-\d{2}-\d{2}/);
+          return match ? match[0] : "";
+        }
+        function filteredAirReportRows() {
+          const from = document.getElementById("airDateFrom").value;
+          const to = document.getElementById("airDateTo").value;
+          if (!from && !to) return [];
+          return airReportRows.filter((row) => {
+            const date = airRowDate(row);
+            if (from && (!date || date < from)) return false;
+            if (to && (!date || date > to)) return false;
+            return true;
+          });
+        }
+        function airRowHtml(row) {
+          const idAttr = row.id ? ' data-row-id="' + row.id + '"' : "";
+          return (
+            "<tr" + idAttr + ">" +
+              '<td>' + escapeHtml(airRowDate(row)) + "</td>" +
+              '<td contenteditable="true" data-col="time">' + escapeHtml(row.time || "") + "</td>" +
+              '<td contenteditable="true" data-col="movements">' + escapeHtml(row.movements || "") + "</td>" +
+              '<td contenteditable="true" data-col="remarks">' + escapeHtml(row.remarks || "") + "</td>" +
+              '<td><button class="btn danger small" data-act="delrow">&#10005;</button></td>' +
+            "</tr>"
+          );
+        }
+        function renderAirRows(items) {
+          if (items) airReportRows = items;
+          document.getElementById("airRows").innerHTML =
+            filteredAirReportRows().map((row) => airRowHtml(row)).join("");
+        }
+        async function loadReportRows() {
+          try {
+            const r = await api("/api/stt/report/rows");
+            renderAirRows(r.items || []);
+          } catch (_) { /* not logged in yet or no rows */ }
+        }
+        document.getElementById("airDateFrom").addEventListener("change", () => renderAirRows());
+        document.getElementById("airDateTo").addEventListener("change", () => renderAirRows());
+        document.getElementById("airFilterClear").addEventListener("click", () => {
+          document.getElementById("airDateFrom").value = "";
+          document.getElementById("airDateTo").value = "";
+          renderAirRows();
+        });
+        document.getElementById("airGenerate").addEventListener("click", async () => {
+          const busy = document.getElementById("airBusy");
+          const statusLine = document.getElementById("airStatusLine");
+          const btn = document.getElementById("airGenerate");
+          busy.style.display = "";
+          btn.disabled = true;
+          statusLine.textContent = "Generating report…";
+          try {
+            // Generation runs one slow AI inference per time-group, so the server
+            // processes only a few groups per request (to stay under the portal's
+            // proxy timeout). Loop until it reports no more groups remain.
+            let totalAdded = 0;
+            let lastItems = [];
+            let guard = 0;
+            // Only draft the occurrences within the selected date filter.
+            const genMeta = airMeta();
+            genMeta.dateFrom = document.getElementById("airDateFrom").value;
+            genMeta.dateTo = document.getElementById("airDateTo").value;
+            while (true) {
+              if (++guard > 1000) break; // safety: never loop forever
+              const r = await api("/api/stt/report/rows/generate", { method: "POST", body: JSON.stringify(genMeta) });
+              lastItems = r.items || lastItems;
+              totalAdded += (r.added || 0);
+              renderAirRows(r.items || []);
+              if (r.added === 0 && !r.hasMore) {
+                if (totalAdded === 0) { statusLine.textContent = r.message || "No new entries to add."; }
+                break;
+              }
+              statusLine.textContent = "Generating… " + ((r.items || []).length) + " row(s) so far" + (r.hasMore ? " (continuing…)" : "");
+              if (!r.hasMore) break;
+            }
+            if (totalAdded > 0) {
+              statusLine.textContent = "Added " + totalAdded + " new row(s). Total " + (lastItems.length) + ".";
+            }
+          } catch (err) { statusLine.textContent = err.message; toast(err.message); }
+          finally { busy.style.display = "none"; btn.disabled = false; }
+        });
+        document.getElementById("airSave").addEventListener("click", async () => {
+          const statusLine = document.getElementById("airStatusLine");
+          try {
+            const r = await api("/api/stt/report/rows/save", { method: "POST", body: JSON.stringify({ rows: readRows("airRows") }) });
+            renderAirRows(r.items || []);
+            statusLine.textContent = "Draft saved.";
+            toast("Draft saved");
+          } catch (err) { statusLine.textContent = err.message; toast(err.message); }
+        });
+        document.getElementById("airClear").addEventListener("click", async () => {
+          if (!confirm("Clear the saved AI report draft? Entries are kept; the next Generate rebuilds from scratch.")) return;
+          try {
+            await api("/api/stt/report/rows/clear", { method: "POST" });
+            airReportRows = [];
+            document.getElementById("airRows").innerHTML = "";
+            document.getElementById("airStatusLine").textContent = "Report cleared.";
+          } catch (err) { toast(err.message); }
+        });
+        document.getElementById("airAddRow").addEventListener("click", () => {
+          document.getElementById("airRows").insertAdjacentHTML("beforeend", airRowHtml({}));
+        });
+        document.getElementById("airDownload").addEventListener("click", () => {
+          downloadDocx(readRows("airRows"), airMeta());
+        });
+
+        // --- Settings: folders / model / code names -------------------------
+        function renderCodeNames(pairs) {
+          document.getElementById("codeNameRows").innerHTML = (pairs || []).map((p) => (
+            "<tr>" +
+              '<td contenteditable="true" data-col="from">' + escapeHtml(p.from) + "</td>" +
+              '<td contenteditable="true" data-col="to">' + escapeHtml(p.to) + "</td>" +
+              '<td><button class="btn danger small" data-act="delcode">&#10005;</button></td>' +
+            "</tr>"
+          )).join("");
+        }
+        document.getElementById("codeNameRows").addEventListener("click", (e) => {
+          const b = e.target.closest("button[data-act='delcode']");
+          if (b) b.closest("tr").remove();
+        });
+        document.getElementById("codeNameAdd").addEventListener("click", () => {
+          document.getElementById("codeNameRows").insertAdjacentHTML("beforeend",
+            '<tr><td contenteditable="true" data-col="from"></td><td contenteditable="true" data-col="to"></td><td><button class="btn danger small" data-act="delcode">&#10005;</button></td></tr>');
+        });
+        function readCodeNames() {
+          return Array.from(document.querySelectorAll("#codeNameRows tr")).map((tr) => ({
+            from: tr.querySelector('[data-col="from"]').textContent.trim(),
+            to: tr.querySelector('[data-col="to"]').textContent.trim(),
+          })).filter((p) => p.from && p.to);
+        }
+        async function loadSettings() {
+          try {
+            const s = await api("/api/stt/settings");
+            document.getElementById("setAudio1").value = s.audioFolder1 || "";
+            document.getElementById("setAudio2").value = s.audioFolder2 || "";
+            document.getElementById("setOutput").value = s.outputFolder || "";
+            document.getElementById("setModel").value = s.whisperModel || "large-v3-turbo";
+            document.getElementById("setAuto").checked = !!s.autoTranscribe;
+            document.getElementById("setEffective").textContent = "Effective output: " + (s.outputFolderEffective || "");
+            renderCodeNames(s.codeNames || []);
+          } catch (err) { toast(err.message); }
+        }
+        document.getElementById("setSave").addEventListener("click", async () => {
+          try {
+            await api("/api/stt/settings", { method: "PUT", body: JSON.stringify({
+              audioFolder1: document.getElementById("setAudio1").value,
+              audioFolder2: document.getElementById("setAudio2").value,
+              outputFolder: document.getElementById("setOutput").value,
+              whisperModel: document.getElementById("setModel").value,
+              autoTranscribe: document.getElementById("setAuto").checked,
+            }) });
+            toast("Settings saved");
+            loadSettings();
+          } catch (err) { toast(err.message); }
+        });
+
+        // --- Folder browser modal (server-side directory picker) ------------
+        (function initFolderBrowser() {
+          const modal = document.getElementById("folderModal");
+          const listEl = document.getElementById("folderList");
+          const pathEl = document.getElementById("folderPath");
+          const hintEl = document.getElementById("folderHint");
+          const upBtn = document.getElementById("folderUp");
+          const selBtn = document.getElementById("folderSelect");
+          let targetInputId = null;
+          let currentPath = "";
+          let currentParent = null;
+          let atRoot = false;
+
+          function openFor(inputId) {
+            targetInputId = inputId;
+            const start = (document.getElementById(inputId).value || "").trim();
+            modal.style.display = "flex";
+            load(start);
+          }
+          function close() { modal.style.display = "none"; targetInputId = null; }
+
+          async function load(p) {
+            listEl.innerHTML = '<div class="muted" style="padding:16px">Loading…</div>';
+            try {
+              const q = p ? ("?path=" + encodeURIComponent(p)) : "";
+              const data = await api("/api/stt/browse" + q);
+              currentPath = data.path || "";
+              currentParent = data.parent;
+              atRoot = !!data.isRoot;
+              pathEl.value = currentPath || "(drives)";
+              hintEl.textContent = currentPath ? ("Will select: " + currentPath) : "Pick a drive to open";
+              selBtn.disabled = !currentPath;
+              upBtn.disabled = atRoot || (currentParent === null);
+              renderList(data.folders || []);
+            } catch (err) {
+              listEl.innerHTML = '<div class="muted" style="padding:16px">' + escapeHtml(err.message) + "</div>";
+            }
+          }
+          function renderList(folders) {
+            if (!folders.length) { listEl.innerHTML = '<div class="muted" style="padding:16px">No sub-folders here.</div>'; return; }
+            listEl.innerHTML = folders.map((f) =>
+              '<div class="fb-item" data-path="' + escapeHtml(f.path) + '" style="padding:8px 10px; border-radius:8px; cursor:pointer; display:flex; gap:8px; align-items:center;">' +
+                "<span>📁</span><span style=\"flex:1; word-break:break-all\">" + escapeHtml(f.name) + "</span>" +
+              "</div>"
+            ).join("");
+          }
+          listEl.addEventListener("click", (e) => {
+            const it = e.target.closest(".fb-item");
+            if (it) load(it.getAttribute("data-path"));
+          });
+          upBtn.addEventListener("click", () => {
+            if (currentParent === "" || currentParent) load(currentParent);
+          });
+          document.getElementById("folderDrives").addEventListener("click", () => load(""));
+          selBtn.addEventListener("click", () => {
+            if (targetInputId && currentPath) document.getElementById(targetInputId).value = currentPath;
+            close();
+          });
+          document.getElementById("folderCancel").addEventListener("click", close);
+          document.getElementById("folderClose").addEventListener("click", close);
+          modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+          document.querySelectorAll("button[data-browse]").forEach((btn) => {
+            btn.addEventListener("click", () => openFor(btn.getAttribute("data-browse")));
+          });
+        })();
+        document.getElementById("codeNameSave").addEventListener("click", async () => {
+          try {
+            await api("/api/stt/settings", { method: "PUT", body: JSON.stringify({ codeNames: readCodeNames() }) });
+            toast("Code-name mappings saved");
+          } catch (err) { toast(err.message); }
+        });
+        document.getElementById("dbReset").addEventListener("click", async () => {
+          if (!confirm("Delete ALL transcribe-app data (raw, processed, audio queue, report entries/rows)? Settings are kept. This cannot be undone.")) return;
+          if (!confirm("Are you absolutely sure? This permanently clears the database.")) return;
+          const btn = document.getElementById("dbReset");
+          const info = document.getElementById("dbResetInfo");
+          btn.disabled = true; info.textContent = "Clearing…";
+          try {
+            const r = await api("/api/stt/admin/reset", { method: "POST" });
+            const total = Object.values(r.cleared || {}).reduce((a, b) => a + b, 0);
+            info.textContent = "Cleared " + total + " record(s).";
+            toast("Database cleared");
+            loadRaw(); loadProcessed(); loadEntries(); loadReportRows(); loadAudioStatus();
+          } catch (err) { info.textContent = ""; toast(err.message); }
+          finally { btn.disabled = false; }
+        });
+
+        // --- Settings: background transcription queue -----------------------
+        const sttStatusLabels = { processing: "Transcribing", pending: "Waiting", done: "Done", error: "Error", missing: "Missing" };
+        function sttStatusLabel(s) { return sttStatusLabels[s] || s; }
+        let audioStatusTimer = null;
+        function startAudioStatusPolling() { stopAudioStatusPolling(); audioStatusTimer = setInterval(loadAudioStatus, 3000); }
+        function stopAudioStatusPolling() { if (audioStatusTimer) { clearInterval(audioStatusTimer); audioStatusTimer = null; } }
+        async function loadAudioStatus() {
+          try {
+            const s = await api("/api/stt/audio/status");
+            const remote = s.remote;
+            // If this machine isn't the transcriber (auto OFF) but another machine
+            // is reporting progress into our output folder, show that instead.
+            const useRemote = !!remote && !s.autoTranscribe;
+            const remoteStale = useRemote && remote.updatedAt &&
+              Date.now() - new Date(remote.updatedAt).getTime() > 30000;
+            const transcribing = useRemote ? (remote.transcribing && !remoteStale) : s.transcribing;
+            const nowName = useRemote ? remote.now : ((s.items || []).find((item) => item.status === "processing") || {}).filename;
+            const nowEl = document.getElementById("audioNow");
+            if (transcribing || nowName) {
+              nowEl.innerHTML = '<span class="rec-dot"></span>Detected: ' + escapeHtml(nowName || "audio file") +
+                ' <span class="muted">Transcribing' + (useRemote ? ' on ' + escapeHtml(remote.source || "another PC") : "") + "..." + "</span>";
+            } else if (useRemote && remoteStale) {
+              nowEl.textContent = "Waiting for the transcriber on " + (remote.source || "another PC") + " to reconnect...";
+            } else if (useRemote || s.autoTranscribe) {
+              nowEl.textContent = "Watching for new audio files...";
+            } else {
+              nowEl.textContent = "Auto-transcribe is off.";
+            }
+          } catch (err) { toast(err.message); }
+        }
+        document.getElementById("audioRefresh").addEventListener("click", loadAudioStatus);
+        document.querySelectorAll("button[data-audio-rescan]").forEach((button) => {
+          button.addEventListener("click", async () => {
+            const folder = button.dataset.audioRescan;
+            button.disabled = true;
+            try {
+              const r = await api("/api/stt/audio/rescan", { method: "POST", body: JSON.stringify({ folder }) });
+              toast("Folder " + folder + " rescan found " + (r.scanned || 0) + " audio file(s); " + (r.queued || 0) + " queued, " + (r.requeued || 0) + " restored.");
+              loadAudioStatus();
+            }
+            catch (err) { toast(err.message); }
+            finally { button.disabled = false; }
+          });
+        });
+
+        // --- Settings / polling ---------------------------------------------
+        let pollTimer = null;
+        function applyPolling(seconds) {
+          clearInterval(pollTimer);
+          if (seconds > 0) {
+            pollTimer = setInterval(() => { loadRaw(); loadProcessed(); }, seconds * 1000);
+          }
+        }
+        document.getElementById("savePoll").addEventListener("click", () => {
+          const val = Math.max(0, Math.min(120, parseInt(document.getElementById("pollInterval").value, 10) || 0));
+          document.getElementById("pollInterval").value = String(val);
+          localStorage.setItem("sttPollInterval", String(val));
+          applyPolling(val);
+          toast(val > 0 ? "Auto-refresh every " + val + "s" : "Auto-refresh disabled");
+        });
+
+        // --- Init ------------------------------------------------------------
+        (async function init() {
+          const savedPoll = parseInt(localStorage.getItem("sttPollInterval") || "5", 10);
+          document.getElementById("pollInterval").value = String(Number.isFinite(savedPoll) ? savedPoll : 5);
+          try {
+            await loadSession();
+            await loadProcessed();
+            await loadRaw();
+            await loadEntries();
+            await loadReportRows();
+            await loadLiveMode();
+            setStatus("Connected", true);
+          } catch (_) {
+            setStatus("Offline", false);
+          }
+          refreshAiStatus();
+          applyPolling(Number.isFinite(savedPoll) ? savedPoll : 5);
+        })();
+      })();
+    </script>
+  </body>
+</html>

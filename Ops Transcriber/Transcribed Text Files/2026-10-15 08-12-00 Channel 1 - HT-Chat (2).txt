@@ -1,0 +1,1 @@
+[0.00s -> 3.42s] Control copies, continue reporting visible movements

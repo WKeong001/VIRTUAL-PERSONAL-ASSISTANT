@@ -1,0 +1,1 @@
+[0.00s -> 2.28s] Charlie 5 copies, Resuming Patrol

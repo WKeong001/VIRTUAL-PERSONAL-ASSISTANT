@@ -1,0 +1,1 @@
+[0.00s -> 4.16s] Echo 2, subject entered a small retail shop and remains inside

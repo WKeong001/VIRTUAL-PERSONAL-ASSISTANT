@@ -1,0 +1,1 @@
+[0.00s -> 3.94s] Echo 2, subject enter the food court and remains inside
