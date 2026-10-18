@@ -46,6 +46,11 @@ def _enable_cuda_dll_search() -> None:
                         os.add_dll_directory(bin_dir)
                     except OSError:
                         pass
+                    # CTranslate2 loads cuBLAS lazily via LoadLibrary, which
+                    # ignores add_dll_directory and only searches PATH.
+                    path_entries = os.environ.get("PATH", "").split(os.pathsep)
+                    if bin_dir not in path_entries:
+                        os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
     except Exception:
         # Never let DLL-path setup break model loading; CPU fallback remains.
         pass
@@ -662,6 +667,14 @@ class AudioTranscriber:
                         device="cuda",
                         compute_type=compute_type
                     )
+                    # CUDA libraries (cuBLAS/cuDNN) load lazily, so run a tiny
+                    # inference now to trigger a CPU fallback instead of
+                    # failing on the first real transcription.
+                    import numpy as np
+                    test_segments, _ = self.model.transcribe(
+                        np.zeros(16000, dtype=np.float32), language="en", beam_size=1
+                    )
+                    list(test_segments)
                     self._device = "cuda"
                     self._compute_type = compute_type
                     if progress_callback:
