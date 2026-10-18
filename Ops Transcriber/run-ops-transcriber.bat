@@ -13,6 +13,8 @@ set "STT_STANDALONE=1"
 set "STT_AI_URL=http://127.0.0.1:8756"
 set "AI_SERVICE_HOST=127.0.0.1"
 set "AI_SERVICE_PORT=8756"
+set "AI_VISION_URL=http://127.0.0.1:11434"
+set "AI_VISION_MODEL=qwen2.5vl:3b"
 set "PORT=3011"
 set "HOST=127.0.0.1"
 set "MODEL_PATH=%CD%\models\Llama-3.2-3B-Instruct-Q4_0.gguf"
@@ -34,6 +36,25 @@ call setup.bat
 if errorlevel 1 exit /b 1
 
 :launch
+
+set "OLLAMA_EXE="
+where ollama >nul 2>&1
+if not errorlevel 1 set "OLLAMA_EXE=ollama"
+if not defined OLLAMA_EXE if exist "%LOCALAPPDATA%\Programs\Ollama\ollama.exe" set "OLLAMA_EXE=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
+if not defined OLLAMA_EXE if exist "%ProgramFiles%\Ollama\ollama.exe" set "OLLAMA_EXE=%ProgramFiles%\Ollama\ollama.exe"
+if not defined OLLAMA_EXE (
+    echo [Vision Q^&A] Ollama is not installed. Text-only features will still work.
+    echo [Vision Q^&A] Install it from https://ollama.com/download/windows to enable image and diagram questions.
+) else (
+    "%OLLAMA_EXE%" show "%AI_VISION_MODEL%" >nul 2>&1
+    if errorlevel 1 (
+        echo Downloading local vision model %AI_VISION_MODEL%. This is needed once and may take several minutes...
+        "%OLLAMA_EXE%" pull "%AI_VISION_MODEL%"
+        if errorlevel 1 (
+            echo [Vision Q^&A] Could not download %AI_VISION_MODEL%. Text-only features will still work.
+        )
+    )
+)
 
 start "Ops Transcriber AI" /min "%CD%\.venv\Scripts\python.exe" "%CD%\ai_service.py"
 start "Ops Transcriber" /min node.exe "%CD%\server.js"

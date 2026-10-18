@@ -16,6 +16,8 @@ import json
 import os
 import re
 import threading
+import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -151,6 +153,194 @@ def _warm_up():
         assistant.load()
     except Exception as exc:  # pragma: no cover - defensive
         print(f"[AI Service] Model warm-up failed: {exc}")
+
+
+def _ask_vision_model(prompt, evidence, images, annotation_request=False, grounded_analysis=False):
+    """Ask a locally hosted OpenAI-compatible vision model about uploaded images."""
+    endpoint = str(
+        os.environ.get("AI_VISION_URL")
+        or config.get("ai_vision_url", "")
+        or ""
+    ).strip().rstrip("/")
+    if not endpoint:
+        raise RuntimeError(
+            "Image Q&A needs a local vision model. Configure ai_vision_url and "
+            "ai_vision_model in config.json, or set AI_VISION_URL and AI_VISION_MODEL."
+        )
+
+    if not endpoint.endswith("/chat/completions"):
+        endpoint += "/v1/chat/completions"
+    model = str(
+        os.environ.get("AI_VISION_MODEL")
+        or config.get("ai_vision_model", "")
+        or ""
+    ).strip()
+    evidence_text = "\n\n".join(
+        f"[{item.get('filename', 'Document')}]\n{item.get('content', '')}"
+        for item in evidence
+        if isinstance(item, dict)
+    )
+    annotation_instruction = ""
+    if annotation_request and not grounded_analysis:
+        annotation_instruction = (
+            "\n\nThe user asked to plot a location on the map. Return ONLY valid "
+            'JSON in this shape: {"answer":"short grounded explanation",'
+            '"marker":{"x":number,"y":number,"label":"short label"}}. '
+            "x and y must be percentage coordinates from 0 to 100, where x=0 "
+            "is the left edge and y=0 is the top edge. Return marker as null "
+            "when the sources do not identify a defensible location."
+        )
+    grounding_instruction = ""
+    if grounded_analysis:
+        structured_shape = (
+            '{"answer":"brief grounded answer","marker":{"x":number,"y":number,"label":"short label"},"findings":'
+            '[{"evidence":"exact visible text or observable feature","location":"relative image location","confidence":"high or medium"}]}'
+            if annotation_request
+            else
+            '{"answer":"brief grounded answer","findings":[{"evidence":"exact visible text or observable feature",'
+            '"location":"relative image location",'
+            '"confidence":"high or medium"}]}'
+        )
+        grounding_instruction = (
+            "\n\nPerform evidence-grounded visual analysis for the user's "
+            "specific question. Use only visible, legible text, symbols, "
+            "objects, layout, and the provided document extracts. Do NOT "
+            "invent labels, meanings, locations, routes, identities, or "
+            "relationships that the sources do not show. In particular, do "
+            "not treat a nearby label as describing an object unless the "
+            "image explicitly connects them. Evidence must be either a "
+            "verbatim transcription of visible text in quotation marks or a "
+            "directly observable visual feature; never use a summary such as "
+            "'arrows and labels'. Every factual claim in the answer must be "
+            "supported by at least one finding. Return no more than three "
+            "findings. Keep the answer under 180 characters, each evidence "
+            "item under 80 characters, and each location under 60 characters. "
+            f"Return ONLY valid JSON with this shape: {structured_shape}. "
+            "Use an empty findings array when the sources do not provide "
+            "evidence for an answer."
+        )
+    content = [{
+        "type": "text",
+        "text": (
+            "Answer the user's question using only the uploaded image(s) and "
+            "the provided document extracts. If the answer is not supported, "
+            "say so. Be specific and do not invent safety procedures.\n\n"
+            f"Question: {prompt}\n\nDocument extracts:\n{evidence_text or '(none)'}"
+            f"{annotation_instruction}{grounding_instruction}"
+        ),
+    }]
+    for image in images:
+        if not isinstance(image, dict):
+            continue
+        data = str(image.get("data", "") or "")
+        mime_type = str(image.get("mimeType", "image/jpeg") or "image/jpeg")
+        if data:
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime_type};base64,{data}"},
+            })
+    if len(content) == 1:
+        raise RuntimeError("No readable uploaded image was supplied.")
+
+    payload = {
+        "messages": [
+            {"role": "system", "content": "You are a careful offline document assistant."},
+            {"role": "user", "content": content},
+        ],
+        "temperature": 0.2,
+        "max_tokens": int(config.get("ai_vision_max_tokens", 512) or 512),
+    }
+    if model:
+        payload["model"] = model
+    if annotation_request or grounded_analysis:
+        payload["format"] = "json"
+    request = urllib.request.Request(
+        endpoint,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=180) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Local vision model returned HTTP {exc.code}: {detail[:500]}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Local vision model is unreachable: {exc.reason}") from exc
+
+    choices = result.get("choices") if isinstance(result, dict) else None
+    message = choices[0].get("message", {}) if isinstance(choices, list) and choices else {}
+    answer = message.get("content", "") if isinstance(message, dict) else ""
+    if isinstance(answer, list):
+        answer = "".join(
+            str(part.get("text", "")) for part in answer if isinstance(part, dict)
+        )
+    answer = str(answer or "").strip()
+    if not answer:
+        raise RuntimeError("Local vision model returned no answer.")
+    if annotation_request or grounded_analysis:
+        try:
+            structured_json = re.sub(
+                r"^```(?:json)?\s*|\s*```$",
+                "",
+                answer.strip(),
+                flags=re.IGNORECASE,
+            )
+            structured_answer = json.loads(structured_json)
+            if not isinstance(structured_answer.get("answer"), str):
+                raise ValueError("Missing answer")
+            marker = structured_answer.get("marker") if annotation_request else None
+            if marker is not None:
+                if not isinstance(marker, dict):
+                    raise ValueError("Invalid marker")
+                marker = {
+                    "x": max(0, min(100, float(marker["x"]))),
+                    "y": max(0, min(100, float(marker["y"]))),
+                    "label": str(marker.get("label", "")).strip()[:80],
+                }
+            findings = []
+            if grounded_analysis:
+                raw_findings = structured_answer.get("findings")
+                if not isinstance(raw_findings, list):
+                    raise ValueError("Missing findings")
+                for finding in raw_findings[:8]:
+                    if not isinstance(finding, dict):
+                        continue
+                    visible_evidence = str(finding.get("evidence", "")).strip()[:160]
+                    location = str(finding.get("location", "")).strip()[:160]
+                    confidence = str(finding.get("confidence", "")).strip().lower()
+                    if visible_evidence and location and confidence in {"high", "medium"}:
+                        findings.append({
+                            "evidence": visible_evidence,
+                            "location": location,
+                            "confidence": confidence,
+                        })
+            return structured_answer["answer"].strip(), marker, findings
+        except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            if grounded_analysis:
+                return "", None, []
+            raise RuntimeError("Local vision model did not return valid structured safety data.") from exc
+    return answer, None, []
+
+
+def _format_grounded_vision_answer(answer, findings):
+    if not findings:
+        if answer.strip():
+            return (
+                f"{answer.strip()}\n\n"
+                "Verification note: the model could not return structured visual "
+                "evidence for this description. Review the source image before "
+                "relying on it."
+            )
+        return "The selected sources do not provide enough visible evidence to answer that reliably."
+    lines = [answer.strip(), "", "Visible evidence:"]
+    for index, finding in enumerate(findings, start=1):
+        lines.append(
+            f"{index}. {finding['evidence']} - {finding['location']} "
+            f"({finding['confidence']} confidence)"
+        )
+    return "\n".join(lines)
 
 
 def _center_docx_cell(cell):
@@ -420,6 +610,58 @@ class Handler(BaseHTTPRequestHandler):
                 with _model_lock:
                     answer = assistant.ask_general(prompt, history=history, mode=mode)
                 self._send(200, {"answer": answer, "status": assistant.get_status()})
+                return
+
+            if route == "/ask_documents":
+                prompt = str(data.get("prompt", "") or "").strip()
+                evidence = data.get("evidence") if isinstance(data.get("evidence"), list) else []
+                images = data.get("images") if isinstance(data.get("images"), list) else []
+                if not prompt:
+                    self._send(400, {"error": "prompt is required"})
+                    return
+                if not evidence and not images:
+                    self._send(400, {"error": "No readable document content or images were supplied."})
+                    return
+                annotation_request = bool(data.get("annotationRequest", False))
+                grounded_analysis = bool(data.get("groundedAnalysis", False))
+                marker = None
+                findings = []
+                if images:
+                    answer, marker, findings = _ask_vision_model(
+                        prompt,
+                        evidence,
+                        images,
+                        annotation_request=annotation_request,
+                        grounded_analysis=grounded_analysis,
+                    )
+                    if grounded_analysis:
+                        answer = _format_grounded_vision_answer(answer, findings)
+                else:
+                    logs = [
+                        {
+                            "filename": str(item.get("filename", "") or ""),
+                            "content": str(item.get("content", "") or ""),
+                            "edited_content": str(item.get("content", "") or ""),
+                        }
+                        for item in evidence
+                        if isinstance(item, dict) and str(item.get("content", "") or "").strip()
+                    ]
+                    with _model_lock:
+                        answer = assistant.ask_documents(prompt, logs)
+                sources = []
+                for item in evidence:
+                    if isinstance(item, dict) and item.get("filename"):
+                        sources.append(str(item["filename"]))
+                for image in images:
+                    if isinstance(image, dict) and image.get("filename"):
+                        sources.append(str(image["filename"]))
+                self._send(200, {
+                    "answer": answer,
+                    "sources": list(dict.fromkeys(sources)),
+                    "marker": marker,
+                    "visualFindings": findings,
+                    "status": assistant.get_status(),
+                })
                 return
 
             if route == "/ask_logs":

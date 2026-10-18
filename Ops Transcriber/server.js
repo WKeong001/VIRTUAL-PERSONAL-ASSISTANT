@@ -17,6 +17,7 @@ const baseDir = __dirname;
 const appDir = baseDir;
 const dataDir = process.env.DB_DIR ? String(process.env.DB_DIR) : baseDir;
 const uploadsDir = process.env.UPLOADS_DIR ? String(process.env.UPLOADS_DIR) : path.join(baseDir, "Data", "uploads");
+const knowledgeUploadsDir = path.join(dataDir, "knowledge-uploads");
 const settingsFile = path.join(dataDir, "app-settings.json");
 const defaultMobilePhotosDir = path.join(process.env.USERPROFILE || process.env.HOME || os.homedir(), "Downloads", "Mobile Devices");
 
@@ -88,6 +89,7 @@ const allowedOriginsFromEnv = String(process.env.ALLOWED_ORIGINS || "")
 
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+if (!fs.existsSync(knowledgeUploadsDir)) fs.mkdirSync(knowledgeUploadsDir, { recursive: true });
 
 // Verify the data directory is writable. SQLite (especially in WAL mode) must
 // create journal/-wal/-shm files here, so if the directory is not writable the
@@ -1280,6 +1282,17 @@ function initSttDb() {
       UNIQUE(folder, relative_path)
     );
 
+    CREATE TABLE IF NOT EXISTS stt_knowledge_documents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL DEFAULT 0,
+      original_name TEXT NOT NULL,
+      stored_name TEXT NOT NULL UNIQUE,
+      mime_type TEXT NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      is_image INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
   `);
 }
 initSttDb();
@@ -1981,6 +1994,25 @@ const damageUpload = upload.fields([
   { name: "damagePhoto", maxCount: 1 },
 ]);
 const receiptUpload = upload.single("receiptImage");
+const knowledgeDocumentExtensions = new Set([
+  ".doc", ".docx", ".pdf", ".txt", ".md", ".csv", ".json",
+  ".png", ".jpg", ".jpeg", ".webp",
+]);
+const knowledgeStorage = multer.diskStorage({
+  destination: (_, __, cb) => cb(null, knowledgeUploadsDir),
+  filename: (_, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    cb(null, `${Date.now()}-${crypto.randomBytes(8).toString("hex")}${ext}`);
+  },
+});
+const knowledgeUpload = multer({
+  storage: knowledgeStorage,
+  limits: { fileSize: 15 * 1024 * 1024, files: 10 },
+  fileFilter: (_, file, cb) => {
+    const extension = path.extname(file.originalname || "").toLowerCase();
+    cb(null, knowledgeDocumentExtensions.has(extension));
+  },
+}).array("documents", 10);
 
 function sanitizeInt(value, fallback = 0) {
   const n = Number.parseInt(value, 10);
@@ -4574,6 +4606,89 @@ app.delete("/api/stt/processed/:id", authRequired, (req, res) => {
 const sttAiUrl = (process.env.STT_AI_URL || "http://127.0.0.1:8756").replace(/\/+$/, "");
 const sttAiOfflineHint =
   "AI service is not reachable. Start it by running \"run-ai-service.bat\" (or \"python ai_service.py\") in the Ops Transcriber folder.";
+const knowledgeTextExtensions = new Set([".doc", ".docx", ".pdf", ".txt", ".md", ".csv", ".json"]);
+const knowledgeImageExtensions = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+const knowledgeMimeTypes = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".pdf": "application/pdf",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".txt": "text/plain",
+  ".md": "text/markdown",
+  ".csv": "text/csv",
+  ".json": "application/json",
+};
+
+function knowledgeMimeType(filename, reportedMimeType) {
+  const reported = String(reportedMimeType || "").trim().toLowerCase();
+  if (reported && reported !== "application/octet-stream") return reported;
+  return knowledgeMimeTypes[path.extname(String(filename || "")).toLowerCase()] || "application/octet-stream";
+}
+
+function sttKnowledgeUserId(req) {
+  return req.session && req.session.user && Number.isInteger(req.session.user.id)
+    ? req.session.user.id
+    : 0;
+}
+
+async function readKnowledgeDocument(filePath) {
+  const extension = path.extname(filePath).toLowerCase();
+  if (extension === ".doc" || extension === ".docx") {
+    return readLogsAssistantDocument(filePath);
+  }
+  if (extension === ".pdf") {
+    const python = process.env.AI_PYTHON ||
+      (process.platform === "win32" && fs.existsSync(path.join(baseDir, ".venv", "Scripts", "python.exe"))
+        ? path.join(baseDir, ".venv", "Scripts", "python.exe")
+        : "python");
+    return new Promise((resolve, reject) => {
+      execFile(
+        python,
+        [path.join(baseDir, "document_reader.py"), filePath],
+        { maxBuffer: 1024 * 1024, timeout: 30000 },
+        (error, stdout, stderr) => {
+          if (error) {
+            reject(new Error((stderr || error.message || "PDF extraction failed.").trim()));
+            return;
+          }
+          try {
+            const result = JSON.parse(stdout);
+            if (!result.ok) throw new Error(result.error || "PDF extraction failed.");
+            resolve(String(result.content || ""));
+          } catch (parseError) {
+            reject(parseError);
+          }
+        }
+      );
+    });
+  }
+  return fs.readFileSync(filePath, "utf8");
+}
+
+function selectKnowledgeEvidence(documents, question) {
+  const terms = new Set((String(question || "").toLowerCase().match(/[a-z0-9]{2,}/g) || [])
+    .filter((term) => !new Set(["about", "from", "have", "that", "this", "what", "when", "where", "which", "with", "would", "your"]).has(term)));
+  const matches = [];
+  for (const document of documents) {
+    const content = String(document.content || "").trim();
+    if (!content) continue;
+    const chunks = content.match(/[\s\S]{1,1600}(?:\n|$)/g) || [content];
+    for (const chunk of chunks) {
+      const normalized = chunk.toLowerCase();
+      let score = 0;
+      for (const term of terms) {
+        if (normalized.includes(term)) score += 1;
+      }
+      matches.push({ id: document.id, filename: document.original_name, content: chunk.trim(), score });
+    }
+  }
+  return matches
+    .sort((left, right) => right.score - left.score || left.filename.localeCompare(right.filename))
+    .slice(0, 8);
+}
 const logsAssistantExtensions = new Set([".doc", ".docx", ".txt", ".md", ".csv", ".json"]);
 const logsAssistantCache = {
   folder: "",
@@ -4779,6 +4894,12 @@ function selectLogsAssistantEvidence(documents, query) {
     .map(({ filename, fullPath, paragraph }) => ({ filename, fullPath, paragraph }));
 }
 
+function isMapAnnotationRequest(prompt) {
+  return /\b(plot|mark|annotate|pin|locate|show)\b.*\b(map|image|diagram|plan|point|location|route)\b|\b(evacuation|assembly)\s+point\b/i.test(
+    String(prompt || "")
+  );
+}
+
 async function sttAiRequest(routePath, payload, method, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs || 120000);
@@ -4820,6 +4941,123 @@ app.post("/api/stt/ai/general", authRequired, async (req, res) => {
   try {
     const r = await sttAiRequest("/ask_general", { prompt, history, mode });
     if (!r.ok) return res.status(502).json({ error: (r.data && r.data.error) || "AI service error." });
+    return res.json(r.data);
+  } catch (_) {
+    return res.status(503).json({ error: sttAiOfflineHint });
+  }
+});
+
+app.get("/api/stt/ai/knowledge", authRequired, (req, res) => {
+  const documents = db.prepare(
+    `SELECT id, original_name, mime_type, is_image, created_at
+     FROM stt_knowledge_documents WHERE user_id = ? ORDER BY id DESC`
+  ).all(sttKnowledgeUserId(req));
+  return res.json({ documents });
+});
+
+app.post("/api/stt/ai/knowledge/upload", authRequired, (req, res) => {
+  knowledgeUpload(req, res, async (uploadError) => {
+    if (uploadError) return res.status(400).json({ error: uploadError.message });
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (!files.length) return res.status(400).json({ error: "Choose at least one supported document or image." });
+
+    const insert = db.prepare(
+      `INSERT INTO stt_knowledge_documents
+       (user_id, original_name, stored_name, mime_type, content, is_image)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    );
+    const uploaded = [];
+    try {
+      for (const file of files) {
+        const extension = path.extname(file.originalname || "").toLowerCase();
+        const isImage = knowledgeImageExtensions.has(extension);
+        const content = isImage ? "" : (await readKnowledgeDocument(file.path)).slice(0, 60000);
+        if (!isImage && !content.trim()) throw new Error(`No readable text found in ${file.originalname}.`);
+        const result = insert.run(
+          sttKnowledgeUserId(req),
+          path.basename(file.originalname || file.filename),
+          file.filename,
+          knowledgeMimeType(file.originalname, file.mimetype),
+          content,
+          isImage ? 1 : 0
+        );
+        uploaded.push({ id: result.lastInsertRowid, name: file.originalname, isImage });
+      }
+    } catch (error) {
+      for (const document of uploaded) {
+        db.prepare("DELETE FROM stt_knowledge_documents WHERE id = ?").run(document.id);
+      }
+      for (const file of files) {
+        try { fs.unlinkSync(file.path); } catch (_) {}
+      }
+      return res.status(400).json({ error: error.message || "Could not ingest the uploaded file." });
+    }
+    return res.status(201).json({ documents: uploaded });
+  });
+});
+
+app.delete("/api/stt/ai/knowledge/:id", authRequired, (req, res) => {
+  const id = sanitizeInt(req.params.id, 0);
+  const document = db.prepare(
+    "SELECT * FROM stt_knowledge_documents WHERE id = ? AND user_id = ?"
+  ).get(id, sttKnowledgeUserId(req));
+  if (!document) return res.status(404).json({ error: "Knowledge document not found." });
+  db.prepare("DELETE FROM stt_knowledge_documents WHERE id = ?").run(id);
+  try { fs.unlinkSync(path.join(knowledgeUploadsDir, document.stored_name)); } catch (_) {}
+  return res.json({ ok: true });
+});
+
+app.get("/api/stt/ai/knowledge/:id/image", authRequired, (req, res) => {
+  const id = sanitizeInt(req.params.id, 0);
+  const document = db.prepare(
+    "SELECT * FROM stt_knowledge_documents WHERE id = ? AND user_id = ? AND is_image = 1"
+  ).get(id, sttKnowledgeUserId(req));
+  if (!document) return res.status(404).json({ error: "Knowledge image not found." });
+  const imagePath = path.join(knowledgeUploadsDir, document.stored_name);
+  if (!fs.existsSync(imagePath)) return res.status(404).json({ error: "Knowledge image file is missing." });
+  return res.type(knowledgeMimeType(document.original_name, document.mime_type)).sendFile(imagePath);
+});
+
+app.post("/api/stt/ai/knowledge/ask", authRequired, async (req, res) => {
+  const prompt = String(req.body.prompt || "").trim();
+  if (!prompt) return res.status(400).json({ error: "prompt is required." });
+  const ids = Array.isArray(req.body.documentIds)
+    ? [...new Set(req.body.documentIds.map((id) => sanitizeInt(id, 0)).filter((id) => id > 0))].slice(0, 20)
+    : [];
+  if (!ids.length) return res.status(400).json({ error: "Select at least one ingested document or image." });
+  const placeholders = ids.map(() => "?").join(",");
+  const documents = db.prepare(
+    `SELECT * FROM stt_knowledge_documents WHERE user_id = ? AND id IN (${placeholders})`
+  ).all(sttKnowledgeUserId(req), ...ids);
+  if (!documents.length) return res.status(404).json({ error: "Selected knowledge documents are no longer available." });
+
+  const imageDocuments = documents.filter((document) => document.is_image);
+  const images = imageDocuments.map((document) => ({
+      filename: document.original_name,
+      id: document.id,
+      mimeType: knowledgeMimeType(document.original_name, document.mime_type),
+      data: fs.readFileSync(path.join(knowledgeUploadsDir, document.stored_name)).toString("base64"),
+    }));
+  const textDocuments = documents.filter((document) => !document.is_image);
+  const evidence = selectKnowledgeEvidence(textDocuments, prompt)
+    .slice(0, images.length ? 3 : 8)
+    .map((item) => ({
+      ...item,
+      content: item.content.slice(0, images.length ? 1000 : 1600),
+    }));
+  try {
+    const r = await sttAiRequest("/ask_documents", {
+      prompt,
+      evidence,
+      images,
+      annotationRequest: images.length > 0 && isMapAnnotationRequest(prompt),
+      groundedAnalysis: images.length > 0,
+    });
+    if (!r.ok) return res.status(502).json({ error: (r.data && r.data.error) || "AI service error." });
+    const marker = r.data && r.data.marker;
+    if (marker && images.length) {
+      r.data.annotation = { ...marker, documentId: images[0].id };
+    }
     return res.json(r.data);
   } catch (_) {
     return res.status(503).json({ error: sttAiOfflineHint });
