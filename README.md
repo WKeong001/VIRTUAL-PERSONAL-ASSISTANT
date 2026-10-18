@@ -1,4 +1,4 @@
-# Ops Transcriber
+# Virtual Personal Assistant
 
 Windows application for transcribing radio audio and generating operational reports.
 
