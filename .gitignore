@@ -1,1 +1,9 @@
-Ops Transcriber/models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf
+
+# Large runtime assets are installed or created on the workstation.
+Ops Transcriber/models/
+Ops Transcriber/node_modules/
+Ops Transcriber/.venv/
+Ops Transcriber/Data/
+Ops Transcriber/Input Audio/
+Ops Transcriber/Log Assistant/
+Ops Transcriber/Transcribed Text Files/
