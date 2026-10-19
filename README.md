@@ -51,6 +51,9 @@ When setup completes, the application opens automatically in the default browser
 ```text
 http://127.0.0.1:3011
 ```
+## Database
+
+Sample data dated 15/9/26 and 10/9/26 are already in place for testing.
 
 Keep the command windows open while using the application. Close them when finished.
 
@@ -107,23 +110,6 @@ models during initial setup.
 
 After Ollama is installed, [`run-ops-transcriber.bat`](./Ops%20Transcriber/run-ops-transcriber.bat)
 automatically runs the equivalent of:
-
-```text
-ollama pull qwen2.5vl:3b
-```
-
-Do not add Ollama model files to this repository. Ollama manages them in the
-user's local model storage.
-
-The configuration in [`config.json`](./Ops%20Transcriber/config.json) is:
-
-```json
-"ai_vision_url": "http://127.0.0.1:11434",
-"ai_vision_model": "qwen2.5vl:3b"
-```
-
-Ollama supplies the required local OpenAI-compatible `/v1/chat/completions`
-endpoint.
 
 ### Important safety note
 
